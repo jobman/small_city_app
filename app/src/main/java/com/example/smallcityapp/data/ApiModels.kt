@@ -1,0 +1,68 @@
+package com.example.smallcityapp.data
+
+import com.google.gson.annotations.SerializedName
+
+data class AlarmResponse(
+    val alert: Boolean = false,
+)
+
+data class NewsItem(
+    val id: Long,
+    @SerializedName("tg_id")
+    val telegramId: Long? = null,
+    val title: String,
+    val content: String,
+    val date: String,
+)
+
+data class ExternalLinkItem(
+    val id: Long,
+    val title: String,
+    val url: String,
+    @SerializedName("is_active")
+    val isActive: Boolean,
+)
+
+data class NotificationHistoryResponse(
+    val messages: List<NotificationMessage> = emptyList(),
+)
+
+data class NotificationMessage(
+    val id: Long,
+    val content: String,
+    @SerializedName("created_at")
+    val createdAt: String,
+)
+
+data class OutageLookupRequest(
+    val city: String,
+    val street: String? = null,
+    val building: String? = null,
+)
+
+data class OutageResponse(
+    val city: String,
+    val street: String? = null,
+    val building: String? = null,
+    val queue: String? = null,
+    @SerializedName("updated_at")
+    val updatedAt: String? = null,
+    val periods: List<OutagePeriod> = emptyList(),
+)
+
+data class OutagePeriod(
+    val from: String,
+    val to: String,
+    val duration: String,
+)
+
+data class OutageErrorPayload(
+    val message: String,
+    val options: List<String> = emptyList(),
+)
+
+data class LocalPushMessage(
+    val title: String,
+    val body: String,
+    val receivedAt: Long,
+)

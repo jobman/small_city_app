@@ -1,0 +1,482 @@
+Digital Town Backend Endpoints
+
+Base URL
+- Production example: http://16.16.144.225
+- All paths below are relative to the project root.
+
+General Notes
+- Project uses Django + DRF.
+- Most custom endpoints return JSON.
+- Admin panel also exists at `/admin/`.
+- Some endpoints are public, some require admin or moderator rights.
+
+==================================================
+1. Outages
+==================================================
+
+Endpoint
+- `GET /outages/city-outage/`
+
+Purpose
+- Returns a template of expected request fields for outage lookup.
+
+Auth
+- Public.
+
+Request
+- No parameters required.
+
+Response 200
+- JSON:
+  {
+    "city": "Назва міста/села",
+    "street": "Назва вулиці (якщо є)",
+    "building": "Номер будинку (якщо є)"
+  }
+
+
+Endpoint
+- `POST /outages/city-outage/`
+
+Purpose
+- Returns outage schedule for city / street / building based on local JSON files:
+  - `outages/services/Tronstanchk.json`
+  - `outages/services/periods_output.json`
+
+Auth
+- Public.
+
+Request body
+- JSON.
+- Fields:
+  - `city`: string, required
+  - `street`: string, optional
+  - `building`: string, optional
+
+Success response 200
+- JSON:
+  {
+    "city": "...",
+    "street": "... or null",
+    "building": "... or null",
+    "queue": "черга X.Y or null",
+    "updated_at": "time string from periods_output.json",
+    "periods": [
+      {
+        "from": "...",
+        "to": "...",
+        "duration": "..."
+      }
+    ]
+  }
+
+Validation and error cases
+- 400 if `city` missing / invalid:
+  {
+    "error": "Параметр city обовʼязковий або некоректний",
+    "available_cities": ["..."]
+  }
+
+- 400 if `street` invalid:
+  {
+    "error": "invalid street"
+  }
+
+- 400 if `building` invalid:
+  {
+    "error": "invalid building"
+  }
+
+- 500 if source JSON not found:
+  {
+    "error": "Файли даних не знайдено"
+  }
+
+- 404 if city not found:
+  {
+    "error": "Населений пункт не знайдено"
+  }
+
+- 400 if city requires street, but `street` not provided:
+  {
+    "error": "Для вказаного міста необхідно вказати вулицю",
+    "available_streets": ["..."]
+  }
+
+- 404 if street not found:
+  {
+    "error": "Вулицю не знайдено",
+    "available_streets": ["..."]
+  }
+
+- 400 if street requires building, but `building` not provided:
+  {
+    "error": "Для цієї вулиці необхідно вказати номер будинку",
+    "available_buildings": ["..."]
+  }
+
+- 404 if building not found:
+  {
+    "error": "Будинок не знайдено",
+    "available_buildings": ["..."]
+  }
+
+- 404 if address exists but no schedule:
+  {
+    "error": "Графік відсутній для вказаної адреси"
+  }
+
+Frontend notes
+- Flow is hierarchical:
+  1. send `city`
+  2. if backend asks for street, show street selector
+  3. if backend asks for building, show building selector
+  4. request again with the next field
+
+
+==================================================
+2. News
+==================================================
+
+Endpoint
+- `GET /news/news-list/`
+
+Purpose
+- Returns all news from DB.
+
+Auth
+- Public.
+
+Request
+- No parameters.
+
+Response 200
+- JSON array:
+  [
+    {
+      "id": 1,
+      "tg_id": 18208,
+      "title": "...",
+      "content": "...",
+      "date": "2026-04-16T08:23:00Z"
+    }
+  ]
+
+Frontend notes
+- Response currently returns full news list, not paginated.
+- Response currently returns full `content` for each item.
+
+
+==================================================
+3. External Links
+==================================================
+
+Endpoint
+- `GET /external-links/all-links/`
+
+Purpose
+- Returns all external links from DB.
+
+Auth
+- Public.
+
+Request
+- No parameters.
+
+Response 200
+- JSON array:
+  [
+    {
+      "id": 1,
+      "title": "...",
+      "url": "https://...",
+      "is_active": true
+    }
+  ]
+
+Frontend notes
+- Backend currently returns all records, including inactive ones.
+- If frontend must show only active links, filter by `is_active == true`.
+
+
+==================================================
+4. Notifications
+==================================================
+
+Endpoint
+- `GET /notifications/alarm/`
+
+Purpose
+- Returns current alarm state from `notifications/alarm_state.json`.
+
+Auth
+- Public.
+
+Request
+- No parameters.
+
+Response 200
+- JSON:
+  {
+    "alert": true
+  }
+
+Notes
+- If file read fails, backend returns fallback:
+  {
+    "alert": false
+  }
+
+
+Endpoint
+- `POST /notifications/webhook/`
+
+Purpose
+- Updates alarm state from webhook payload.
+
+Auth
+- Public endpoint in current implementation.
+
+Request body
+- Raw JSON body.
+- Expected structure: list where first item contains `activeAlerts`.
+- Example:
+  [
+    {
+      "activeAlerts": [...]
+    }
+  ]
+
+Success response 200
+- JSON:
+  {
+    "status": "ok"
+  }
+
+Error cases
+- 400 if body cannot be parsed or payload shape is unexpected:
+  {
+    "status": "error",
+    "message": "..."
+  }
+
+- 405 for non-POST:
+  {
+    "status": "method not allowed"
+  }
+
+Notes
+- Alarm is stored as boolean:
+  - `true` if first element has non-empty `activeAlerts`
+  - `false` otherwise
+
+
+Endpoint
+- `GET /notifications/admin-notifications/`
+
+Purpose
+- Returns HTML page for admin notifications UI.
+
+Auth
+- Requires logged-in admin or user in `moderator` group.
+
+Response
+- HTML template, not JSON.
+
+Error cases
+- Redirect to `/admin/login/` if not logged in.
+- 403 if logged in but not staff/moderator.
+
+
+Endpoint
+- `GET /notifications/filters/`
+
+Purpose
+- Returns available filters for admin notifications UI.
+
+Auth
+- Admin only (`IsAdminUser`).
+
+Request
+- No parameters.
+
+Response 200
+- JSON:
+  {
+    "cities": ["..."],
+    "streets": [
+      {
+        "id": 1,
+        "street": "...",
+        "city": "..."
+      }
+    ],
+    "microdistricts": [
+      {
+        "id": 1,
+        "name": "..."
+      }
+    ]
+  }
+
+Error cases
+- 403 if user is not authenticated as admin.
+
+
+Endpoint
+- `POST /notifications/send/`
+
+Purpose
+- Creates admin notification and links it to selected addresses.
+
+Auth
+- Admin or moderator (`IsAdminOrModerator`).
+
+Request body
+- JSON.
+- Fields:
+  - `content`: string, required
+  - `cities`: array of city names, optional
+  - `streets`: array of address IDs, optional
+  - `microdistricts`: array of microdistrict IDs, optional
+
+Example request
+- {
+    "content": "Water shutdown tomorrow",
+    "cities": ["Тростянець"],
+    "streets": [12, 13],
+    "microdistricts": [2]
+  }
+
+Response 200
+- JSON:
+  {
+    "status": "ok",
+    "message": "Water shutdown tomorrow",
+    "addresses_count": 25
+  }
+
+Error cases
+- 400 if `content` missing:
+  {
+    "error": "content required"
+  }
+
+- 403 if user is not admin/moderator.
+
+Notes
+- Address set is union of all selected filters.
+- Backend removes duplicates via `.distinct()`.
+
+
+Endpoint
+- `GET /notifications/history/`
+
+Purpose
+- Returns notification history for one address.
+- Also stores `firebase_token` for that address.
+
+Auth
+- Public in current implementation.
+
+Query parameters
+- `address_id`: integer, required
+- `firebase_token`: string, required
+- `last_date`: ISO datetime string, optional
+
+Example
+- `/notifications/history/?address_id=15&firebase_token=abc123`
+- `/notifications/history/?address_id=15&firebase_token=abc123&last_date=2026-04-16T10:00:00Z`
+
+Response 200
+- JSON:
+  {
+    "messages": [
+      {
+        "id": 10,
+        "content": "...",
+        "created_at": "2026-04-16T10:15:00+00:00"
+      }
+    ]
+  }
+
+Behavior
+- If `last_date` provided:
+  - returns messages with `created_at > last_date`
+- If `last_date` not provided:
+  - returns messages for last 30 days
+- Messages are sorted by `created_at` descending
+
+Error cases
+- 400 if `firebase_token` missing:
+  {
+    "error": "firebase_token required"
+  }
+
+- 400 if `address_id` missing:
+  {
+    "error": "address_id required"
+  }
+
+- 400 if `address_id` invalid or address does not exist:
+  {
+    "error": "invalid address_id"
+  }
+
+- 400 if `last_date` invalid:
+  {
+    "error": "invalid last_date"
+  }
+
+Notes
+- This endpoint has side effect: it saves `firebase_token` + `address`.
+
+
+==================================================
+5. Admin
+==================================================
+
+Endpoint
+- `GET/POST /admin/`
+
+Purpose
+- Standard Django admin.
+
+Auth
+- Django admin authentication required.
+
+Notes
+- Used for managing DB content.
+- Not a custom JSON API.
+
+
+==================================================
+6. Quick Summary For Frontend
+==================================================
+
+Public JSON endpoints
+- `GET /outages/city-outage/`
+- `POST /outages/city-outage/`
+- `GET /news/news-list/`
+- `GET /external-links/all-links/`
+- `GET /notifications/alarm/`
+- `POST /notifications/webhook/`
+- `GET /notifications/history/`
+
+Protected endpoints
+- `GET /notifications/admin-notifications/` -> HTML, admin/moderator
+- `GET /notifications/filters/` -> admin only
+- `POST /notifications/send/` -> admin or moderator
+
+Main frontend integration points
+- Outages:
+  - hierarchical lookup via city -> street -> building
+- News:
+  - list rendering from array of news items
+- External links:
+  - render list of cards/buttons from returned array
+- Alarm:
+  - simple polling endpoint returning `{ "alert": true/false }`
+- Notifications history:
+  - mobile/client endpoint per selected address + firebase token
+
