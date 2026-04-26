@@ -27,12 +27,20 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -40,13 +48,20 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.rememberDatePickerState
 import com.example.smallcityapp.data.ExternalLinkItem
 import com.example.smallcityapp.data.LocalPushMessage
 import com.example.smallcityapp.data.NewsItem
@@ -55,6 +70,7 @@ import com.example.smallcityapp.data.OutagePeriod
 import com.example.smallcityapp.data.OutageResponse
 import com.example.smallcityapp.ui.theme.SmallCityAPPTheme
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -86,8 +102,19 @@ class MainActivity : ComponentActivity() {
                                 NavigationBarItem(
                                     selected = uiState.selectedTab == tab,
                                     onClick = { viewModel.selectTab(tab) },
-                                    icon = { Text(tab.title.take(1)) },
-                                    label = { Text(tab.title) },
+                                    icon = {
+                                        Text(
+                                            text = tab.symbol(),
+                                            style = MaterialTheme.typography.titleMedium,
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = tab.title,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                        )
+                                    },
                                 )
                             }
                         }
@@ -104,7 +131,6 @@ class MainActivity : ComponentActivity() {
                         TownTab.History -> HistoryScreen(
                             modifier = Modifier.padding(innerPadding),
                             uiState = uiState,
-                            onAddressIdChange = viewModel::updateHistoryAddressId,
                             onLastDateChange = viewModel::updateHistoryLastDate,
                             onLoadHistory = viewModel::loadHistory,
                         )
@@ -115,6 +141,7 @@ class MainActivity : ComponentActivity() {
                             onCityChange = viewModel::updateOutageCity,
                             onStreetChange = viewModel::updateOutageStreet,
                             onBuildingChange = viewModel::updateOutageBuilding,
+                            onLoadCityOptions = viewModel::loadOutageCityOptions,
                             onLoadOutages = viewModel::loadOutages,
                         )
 
@@ -166,7 +193,7 @@ private fun NotificationsScreen(
     ) {
         item {
             SectionHeader(
-                title = "Поточний стан",
+                title = "Стан зараз",
                 actionLabel = "Оновити",
                 onAction = onRefresh,
                 isLoading = uiState.isRefreshing,
@@ -176,25 +203,15 @@ private fun NotificationsScreen(
             StatusCard(
                 title = "Тривога",
                 body = when (uiState.alarmActive) {
-                    true -> "Зараз активна повітряна тривога."
-                    false -> "Активної тривоги немає."
-                    null -> "Стан ще не завантажено."
-                },
-            )
-        }
-        item {
-            StatusCard(
-                title = "Firebase token",
-                body = if (uiState.firebaseToken.isBlank()) {
-                    "Токен ще недоступний. Це нормально, якщо Firebase ще не підключений."
-                } else {
-                    uiState.firebaseToken
+                    true -> "Зараз активна повітряна тривога. Будь ласка, подбай про безпеку."
+                    false -> "Наразі активної повітряної тривоги немає."
+                    null -> "Оновлюємо інформацію про тривогу."
                 },
             )
         }
         item {
             SectionHeader(
-                title = "Отримані push-повідомлення",
+                title = "Останні сповіщення",
                 actionLabel = "Оновити",
                 onAction = onRefreshPushes,
                 isLoading = false,
@@ -202,7 +219,7 @@ private fun NotificationsScreen(
         }
         if (uiState.localPushes.isEmpty()) {
             item {
-                EmptyCard("Тут з'являться повідомлення, які прийде через Firebase Cloud Messaging.")
+                EmptyCard("Коли з'являться нові міські сповіщення, вони будуть показані тут.")
             }
         } else {
             items(uiState.localPushes) { push ->
@@ -212,14 +229,25 @@ private fun NotificationsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryScreen(
     modifier: Modifier = Modifier,
     uiState: MainUiState,
-    onAddressIdChange: (String) -> Unit,
     onLastDateChange: (String) -> Unit,
     onLoadHistory: () -> Unit,
 ) {
+    var showDatePicker by remember { mutableStateOf(false) }
+    val initialSelectedDateMillis = remember(uiState.historyLastDate) {
+        parseHistoryDateMillis(uiState.historyLastDate)
+    }
+
+    LaunchedEffect(uiState.outageResult?.addressId, uiState.historyLastDate) {
+        if (uiState.outageResult?.addressId != null) {
+            onLoadHistory()
+        }
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -231,46 +259,63 @@ private fun HistoryScreen(
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
-        item {
-            Text(
-                text = "Сервер вимагає address_id. У поточному описі API немає публічного endpoint-а для пошуку цього ID, тому тут поки ручний ввід.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        if (uiState.outageResult?.addressId == null) {
+            item {
+                EmptyCard("Спочатку оберіть адресу на екрані графіка відключень, а потім тут з'явиться історія повідомлень для неї.")
+            }
+        } else {
+            item {
+                StatusCard(
+                    title = "Обрана адреса",
+                    body = buildString {
+                        append(listOfNotNull(uiState.outageResult.city, uiState.outageResult.street, uiState.outageResult.building).joinToString(", "))
+                        append("\n")
+                        append("address_id=${uiState.outageResult.addressId}")
+                    },
+                )
+            }
         }
         item {
             OutlinedTextField(
-                value = uiState.historyAddressId,
-                onValueChange = onAddressIdChange,
+                value = formatHistoryDateForDisplay(uiState.historyLastDate),
+                onValueChange = {},
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("address_id") },
+                label = { Text("Дата за бажанням") },
+                supportingText = { Text("Якщо дату не обирати, буде завантажено повідомлення за останній місяць") },
+                readOnly = true,
                 singleLine = true,
             )
         }
         item {
-            OutlinedTextField(
-                value = uiState.historyLastDate,
-                onValueChange = onLastDateChange,
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("last_date, optional") },
-                supportingText = { Text("Наприклад: 2026-04-16T10:00:00Z") },
-                singleLine = true,
-            )
-        }
-        item {
-            Button(
-                onClick = onLoadHistory,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.historyLoading,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (uiState.historyLoading) {
-                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                OutlinedButton(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Обрати дату")
                 }
-                Text("Завантажити історію")
+                OutlinedButton(
+                    onClick = { onLastDateChange("") },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Очистити")
+                }
+            }
+        }
+        if (uiState.historyLoading) {
+            item {
+                StatusCard(
+                    title = "Оновлення",
+                    body = "Завантажуємо повідомлення для обраної адреси.",
+                )
             }
         }
         if (uiState.historyMessages.isEmpty()) {
             item {
-                EmptyCard("Після запиту тут з'явиться історія сповіщень для вибраної адреси.")
+                EmptyCard("Тут буде показана історія повідомлень для обраної адреси.")
             }
         } else {
             items(uiState.historyMessages) { message ->
@@ -278,9 +323,39 @@ private fun HistoryScreen(
             }
         }
     }
+
+    if (showDatePicker) {
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = initialSelectedDateMillis,
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                FilledTonalButton(
+                    onClick = {
+                        val selectedMillis = datePickerState.selectedDateMillis
+                        if (selectedMillis != null) {
+                            onLastDateChange(historyDateToIsoString(selectedMillis))
+                        }
+                        showDatePicker = false
+                    },
+                ) {
+                    Text("Готово")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDatePicker = false }) {
+                    Text("Скасувати")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun OutagesScreen(
     modifier: Modifier = Modifier,
@@ -288,8 +363,13 @@ private fun OutagesScreen(
     onCityChange: (String) -> Unit,
     onStreetChange: (String) -> Unit,
     onBuildingChange: (String) -> Unit,
+    onLoadCityOptions: () -> Unit,
     onLoadOutages: () -> Unit,
 ) {
+    var cityDropdownExpanded by remember { mutableStateOf(false) }
+    var streetDropdownExpanded by remember { mutableStateOf(false) }
+    var buildingDropdownExpanded by remember { mutableStateOf(false) }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -302,42 +382,178 @@ private fun OutagesScreen(
             )
         }
         item {
-            OutlinedTextField(
-                value = uiState.outageCity,
-                onValueChange = onCityChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Місто або село") },
-                singleLine = true,
-            )
+            ExposedDropdownMenuBox(
+                expanded = cityDropdownExpanded,
+                onExpandedChange = { expanded ->
+                    cityDropdownExpanded = expanded
+                    if (expanded && uiState.outageCityOptions.isEmpty()) {
+                        onLoadCityOptions()
+                    }
+                },
+            ) {
+                OutlinedTextField(
+                    value = uiState.outageCity,
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    label = { Text("Місто або село") },
+                    placeholder = { Text("Обери місто зі списку") },
+                    readOnly = true,
+                    singleLine = true,
+                    trailingIcon = {
+                        if (uiState.outageCityOptionsLoading) {
+                            CircularProgressIndicator()
+                        } else {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = cityDropdownExpanded)
+                        }
+                    },
+                )
+                DropdownMenu(
+                    expanded = cityDropdownExpanded,
+                    onDismissRequest = { cityDropdownExpanded = false },
+                ) {
+                    uiState.outageCityOptions.forEach { city ->
+                        DropdownMenuItem(
+                            text = { Text(city) },
+                            onClick = {
+                                onCityChange(city)
+                                cityDropdownExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
         }
         item {
-            OutlinedTextField(
-                value = uiState.outageStreet,
-                onValueChange = onStreetChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Вулиця, якщо потрібна") },
-                singleLine = true,
-            )
+            ExposedDropdownMenuBox(
+                expanded = streetDropdownExpanded,
+                onExpandedChange = { expanded ->
+                    if (uiState.outageStreetOptions.isNotEmpty()) {
+                        streetDropdownExpanded = expanded
+                    }
+                },
+            ) {
+                OutlinedTextField(
+                    value = uiState.outageStreet,
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    label = { Text("Вулиця, якщо потрібна") },
+                    placeholder = { Text("Обери вулицю") },
+                    readOnly = true,
+                    enabled = uiState.outageStreetOptions.isNotEmpty(),
+                    singleLine = true,
+                    trailingIcon = {
+                        if (uiState.outageStreetOptions.isNotEmpty()) {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = streetDropdownExpanded)
+                        }
+                    },
+                )
+                DropdownMenu(
+                    expanded = streetDropdownExpanded,
+                    onDismissRequest = { streetDropdownExpanded = false },
+                ) {
+                    uiState.outageStreetOptions.forEach { street ->
+                        DropdownMenuItem(
+                            text = { Text(street) },
+                            onClick = {
+                                onStreetChange(street)
+                                streetDropdownExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
         }
         item {
-            OutlinedTextField(
-                value = uiState.outageBuilding,
-                onValueChange = onBuildingChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Будинок, якщо потрібен") },
-                singleLine = true,
+            ExposedDropdownMenuBox(
+                expanded = buildingDropdownExpanded,
+                onExpandedChange = { expanded ->
+                    if (uiState.outageBuildingOptions.isNotEmpty()) {
+                        buildingDropdownExpanded = expanded
+                    }
+                },
+            ) {
+                OutlinedTextField(
+                    value = uiState.outageBuilding,
+                    onValueChange = {},
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(),
+                    label = { Text("Будинок, якщо потрібен") },
+                    placeholder = { Text("Обери будинок") },
+                    readOnly = true,
+                    enabled = uiState.outageBuildingOptions.isNotEmpty(),
+                    singleLine = true,
+                    trailingIcon = {
+                        if (uiState.outageBuildingOptions.isNotEmpty()) {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = buildingDropdownExpanded)
+                        }
+                    },
+                )
+                DropdownMenu(
+                    expanded = buildingDropdownExpanded,
+                    onDismissRequest = { buildingDropdownExpanded = false },
+                ) {
+                    uiState.outageBuildingOptions.forEach { building ->
+                        DropdownMenuItem(
+                            text = { Text(building) },
+                            onClick = {
+                                onBuildingChange(building)
+                                buildingDropdownExpanded = false
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        uiState.outageGuidance?.let { guidance ->
+            item {
+                EmptyCard("Ще трохи: $guidance")
+            }
+        }
+        item {
+            StatusCard(
+                title = "Статус адреси",
+                body = if (uiState.outageResult?.addressId != null) {
+                    "Адресу підтверджено. Тепер можна переглядати графік та історію повідомлень для неї."
+                } else {
+                    "Щоб побачити точний графік, оберіть адресу повністю."
+                },
             )
+        }
+        if (uiState.outageResult?.addressId != null) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF1B8A3C),
+                    )
+                    Text(
+                        text = "Адресу підтверджено",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
         }
         item {
             Button(
                 onClick = onLoadOutages,
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !uiState.outageLoading,
+                enabled = !uiState.outageLoading && uiState.outageResult?.addressId != null,
             ) {
                 if (uiState.outageLoading) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
                 }
-                Text("Перевірити графік")
+                Text("Показати графік")
             }
         }
         uiState.outageResult?.let { result ->
@@ -359,7 +575,7 @@ private fun OutagesScreen(
             }
             if (result.periods.isEmpty()) {
                 item {
-                    EmptyCard("Для цієї адреси сервер не повернув часових проміжків.")
+                    EmptyCard("Для цієї адреси зараз немає доступного графіка відключень.")
                 }
             } else {
                 items(result.periods) { period ->
@@ -383,7 +599,7 @@ private fun NewsScreen(
     ) {
         item {
             SectionHeader(
-                title = "Стрічка новин",
+                title = "Новини громади",
                 actionLabel = "Оновити",
                 onAction = onRefresh,
                 isLoading = uiState.isRefreshing,
@@ -391,7 +607,7 @@ private fun NewsScreen(
         }
         if (uiState.news.isEmpty()) {
             item {
-                EmptyCard("Новини ще не завантажені або сервер повернув порожній список.")
+                EmptyCard("Поки що новин немає або вони ще завантажуються.")
             }
         } else {
             items(uiState.news) { news ->
@@ -415,7 +631,7 @@ private fun LinksScreen(
     ) {
         item {
             SectionHeader(
-                title = "Додаткові ресурси",
+                title = "Корисні посилання",
                 actionLabel = "Оновити",
                 onAction = onRefresh,
                 isLoading = uiState.isRefreshing,
@@ -423,7 +639,7 @@ private fun LinksScreen(
         }
         if (uiState.links.isEmpty()) {
             item {
-                EmptyCard("Активні ресурси поки відсутні.")
+                EmptyCard("Поки що немає доступних посилань.")
             }
         } else {
             items(uiState.links) { link ->
@@ -443,12 +659,20 @@ private fun SectionHeader(
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = title,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.headlineSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
-        FilledTonalButton(onClick = onAction, enabled = !isLoading) {
+        FilledTonalButton(
+            onClick = onAction,
+            enabled = !isLoading,
+            modifier = Modifier.padding(start = 12.dp),
+        ) {
             Text(actionLabel)
         }
     }
@@ -511,7 +735,7 @@ private fun MessageCard(message: NotificationMessage) {
         ) {
             Text(message.content)
             Text(
-                text = formatIsoDateTime(message.createdAt),
+                text = "Надіслано ${formatIsoDateTime(message.createdAt)}",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -526,7 +750,7 @@ private fun OutagePeriodCard(period: OutagePeriod) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text("З ${formatIsoDateTime(period.from)} до ${formatIsoDateTime(period.to)}")
-            Text("Тривалість: ${period.duration}")
+            Text("Тривалість відключення: ${period.duration}")
         }
     }
 }
@@ -567,9 +791,17 @@ private fun LinkCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(link.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(link.url, color = MaterialTheme.colorScheme.primary)
+            Text("Відкрити посилання", color = MaterialTheme.colorScheme.primary)
         }
     }
+}
+
+private fun TownTab.symbol(): String = when (this) {
+    TownTab.Notifications -> "\uD83D\uDD14"
+    TownTab.History -> "\uD83D\uDCDC"
+    TownTab.Outages -> "\u26A1"
+    TownTab.News -> "\uD83D\uDCF0"
+    TownTab.Links -> "\uD83D\uDD17"
 }
 
 private fun formatIsoDateTime(value: String): String {
@@ -579,5 +811,36 @@ private fun formatIsoDateTime(value: String): String {
     }.getOrDefault(value)
 }
 
+private fun formatHistoryDateForDisplay(value: String): String {
+    if (value.isBlank()) {
+        return ""
+    }
+    return runCatching {
+        val instant = Instant.parse(value)
+        HISTORY_DATE_FORMATTER.format(instant.atZone(ZoneId.systemDefault()).toLocalDate())
+    }.getOrDefault(value)
+}
+
+private fun parseHistoryDateMillis(value: String): Long? {
+    if (value.isBlank()) {
+        return null
+    }
+    return runCatching {
+        Instant.parse(value).toEpochMilli()
+    }.getOrNull()
+}
+
+private fun historyDateToIsoString(selectedMillis: Long): String {
+    return Instant.ofEpochMilli(selectedMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDate()
+        .atStartOfDay(ZoneId.systemDefault())
+        .toInstant()
+        .toString()
+}
+
 private val DATE_TIME_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+
+private val HISTORY_DATE_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("dd.MM.yyyy")

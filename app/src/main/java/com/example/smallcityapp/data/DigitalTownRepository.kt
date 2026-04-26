@@ -1,6 +1,6 @@
 package com.example.smallcityapp.data
 
-import com.example.smallcityapp.BuildConfig
+import com.example.smallcityapp.config.ServerConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONArray
@@ -37,19 +37,44 @@ class DigitalTownRepository(
 
     suspend fun getOutages(request: OutageLookupRequest): Result<OutageResponse> {
         return runCatching {
+            val state = lookupOutageState(request).getOrThrow()
+            state.response ?: throw IllegalStateException(
+                buildString {
+                    append(state.message ?: "Не вдалося отримати графік відключень")
+                    val options = buildList {
+                        addAll(state.availableCities)
+                        addAll(state.availableStreets)
+                        addAll(state.availableBuildings)
+                    }
+                    if (options.isNotEmpty()) {
+                        append("\n")
+                        append(options.joinToString())
+                    }
+                },
+            )
+        }
+    }
+
+    suspend fun getOutageCities(): Result<List<String>> {
+        return runCatching {
+            lookupOutageState(OutageLookupRequest(city = "")).getOrThrow().availableCities
+        }
+    }
+
+    suspend fun lookupOutageState(request: OutageLookupRequest): Result<OutageLookupState> {
+        return runCatching {
             val response = api.getOutages(request)
             if (response.isSuccessful) {
-                response.body() ?: error("Порожня відповідь сервера")
+                OutageLookupState(
+                    response = response.body() ?: error("Порожня відповідь сервера"),
+                )
             } else {
                 val payload = parseOutageError(response.errorBody()?.string())
-                throw IllegalStateException(
-                    buildString {
-                        append(payload.message)
-                        if (payload.options.isNotEmpty()) {
-                            append("\n")
-                            append(payload.options.joinToString())
-                        }
-                    },
+                OutageLookupState(
+                    message = payload.message,
+                    availableCities = payload.availableCities,
+                    availableStreets = payload.availableStreets,
+                    availableBuildings = payload.availableBuildings,
                 )
             }
         }
@@ -62,14 +87,11 @@ class DigitalTownRepository(
 
         return runCatching {
             val json = JSONObject(rawBody)
-            val options = buildList {
-                addAll(json.optJSONArrayStrings("available_cities"))
-                addAll(json.optJSONArrayStrings("available_streets"))
-                addAll(json.optJSONArrayStrings("available_buildings"))
-            }.distinct()
             OutageErrorPayload(
                 message = json.optString("error", "Не вдалося отримати графік відключень"),
-                options = options,
+                availableCities = json.optJSONArrayStrings("available_cities"),
+                availableStreets = json.optJSONArrayStrings("available_streets"),
+                availableBuildings = json.optJSONArrayStrings("available_buildings"),
             )
         }.getOrElse {
             OutageErrorPayload(message = rawBody)
@@ -87,7 +109,7 @@ class DigitalTownRepository(
                 .build()
 
             return Retrofit.Builder()
-                .baseUrl(BuildConfig.BASE_URL)
+                .baseUrl(ServerConfig.BASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()

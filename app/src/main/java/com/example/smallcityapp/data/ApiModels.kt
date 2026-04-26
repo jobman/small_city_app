@@ -41,6 +41,8 @@ data class OutageLookupRequest(
 )
 
 data class OutageResponse(
+    @SerializedName("address_id")
+    val addressId: Int? = null,
     val city: String,
     val street: String? = null,
     val building: String? = null,
@@ -58,7 +60,17 @@ data class OutagePeriod(
 
 data class OutageErrorPayload(
     val message: String,
-    val options: List<String> = emptyList(),
+    val availableCities: List<String> = emptyList(),
+    val availableStreets: List<String> = emptyList(),
+    val availableBuildings: List<String> = emptyList(),
+)
+
+data class OutageLookupState(
+    val response: OutageResponse? = null,
+    val message: String? = null,
+    val availableCities: List<String> = emptyList(),
+    val availableStreets: List<String> = emptyList(),
+    val availableBuildings: List<String> = emptyList(),
 )
 
 data class LocalPushMessage(

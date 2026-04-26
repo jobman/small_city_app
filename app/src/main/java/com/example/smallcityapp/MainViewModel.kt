@@ -21,11 +21,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class TownTab(val title: String) {
-    Notifications("Сповіщення"),
+    Notifications("Сповіщ."),
     History("Історія"),
-    Outages("Відключення"),
+    Outages("Графік"),
     News("Новини"),
-    Links("Ресурси"),
+    Links("Ще"),
 }
 
 data class MainUiState(
@@ -40,14 +40,18 @@ data class MainUiState(
     val newsError: String? = null,
     val links: List<ExternalLinkItem> = emptyList(),
     val linksError: String? = null,
-    val historyAddressId: String = "",
     val historyLastDate: String = "",
     val historyMessages: List<NotificationMessage> = emptyList(),
     val historyLoading: Boolean = false,
     val historyError: String? = null,
+    val outageCityOptions: List<String> = emptyList(),
+    val outageCityOptionsLoading: Boolean = false,
+    val outageStreetOptions: List<String> = emptyList(),
+    val outageBuildingOptions: List<String> = emptyList(),
     val outageCity: String = "",
     val outageStreet: String = "",
     val outageBuilding: String = "",
+    val outageGuidance: String? = null,
     val outageLoading: Boolean = false,
     val outageResult: OutageResponse? = null,
     val outageError: String? = null,
@@ -69,24 +73,56 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(selectedTab = tab) }
     }
 
-    fun updateHistoryAddressId(value: String) {
-        _uiState.update { it.copy(historyAddressId = value) }
-    }
-
     fun updateHistoryLastDate(value: String) {
         _uiState.update { it.copy(historyLastDate = value) }
     }
 
     fun updateOutageCity(value: String) {
-        _uiState.update { it.copy(outageCity = value) }
+        _uiState.update {
+            it.copy(
+                outageCity = value,
+                outageStreetOptions = emptyList(),
+                outageBuildingOptions = emptyList(),
+                outageStreet = "",
+                outageBuilding = "",
+                outageGuidance = null,
+                historyMessages = emptyList(),
+                historyError = null,
+                outageResult = null,
+                outageError = null,
+            )
+        }
+        resolveOutageSelection()
     }
 
     fun updateOutageStreet(value: String) {
-        _uiState.update { it.copy(outageStreet = value) }
+        _uiState.update {
+            it.copy(
+                outageStreet = value,
+                outageBuildingOptions = emptyList(),
+                outageBuilding = "",
+                outageGuidance = null,
+                historyMessages = emptyList(),
+                historyError = null,
+                outageResult = null,
+                outageError = null,
+            )
+        }
+        resolveOutageSelection()
     }
 
     fun updateOutageBuilding(value: String) {
-        _uiState.update { it.copy(outageBuilding = value) }
+        _uiState.update {
+            it.copy(
+                outageBuilding = value,
+                outageGuidance = null,
+                historyMessages = emptyList(),
+                historyError = null,
+                outageResult = null,
+                outageError = null,
+            )
+        }
+        resolveOutageSelection()
     }
 
     fun refreshDashboard() {
@@ -131,9 +167,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadHistory() {
-        val addressId = uiState.value.historyAddressId.toIntOrNull()
+        val addressId = uiState.value.outageResult?.addressId
         if (addressId == null) {
-            _uiState.update { it.copy(historyError = "Вкажи коректний address_id") }
+            _uiState.update {
+                it.copy(historyError = "Спочатку обери адресу на екрані графіка відключень")
+            }
             return
         }
 
@@ -196,6 +234,63 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     outageLoading = false,
                     outageResult = result.getOrNull(),
                     outageError = result.exceptionOrNull()?.localizedMessage,
+                )
+            }
+        }
+    }
+
+    fun loadOutageCityOptions() {
+        if (uiState.value.outageCityOptionsLoading) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(outageCityOptionsLoading = true, outageError = null) }
+            val result = repository.getOutageCities()
+            _uiState.update {
+                it.copy(
+                    outageCityOptionsLoading = false,
+                    outageCityOptions = result.getOrDefault(emptyList()),
+                    outageError = result.exceptionOrNull()?.localizedMessage,
+                )
+            }
+        }
+    }
+
+    private fun resolveOutageSelection() {
+        val state = uiState.value
+        if (state.outageCity.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(outageLoading = true, outageError = null, outageGuidance = null) }
+            val result = repository.lookupOutageState(
+                OutageLookupRequest(
+                    city = state.outageCity.trim(),
+                    street = state.outageStreet.trim().ifBlank { null },
+                    building = state.outageBuilding.trim().ifBlank { null },
+                ),
+            )
+
+            _uiState.update { current ->
+                result.fold(
+                    onSuccess = { lookup ->
+                        current.copy(
+                            outageLoading = false,
+                            outageResult = lookup.response,
+                            outageGuidance = lookup.message,
+                            outageStreetOptions = lookup.availableStreets,
+                            outageBuildingOptions = lookup.availableBuildings,
+                            outageError = null,
+                        )
+                    },
+                    onFailure = { error ->
+                        current.copy(
+                            outageLoading = false,
+                            outageError = error.localizedMessage,
+                        )
+                    },
                 )
             }
         }
