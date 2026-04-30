@@ -280,8 +280,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             outageLoading = false,
                             outageResult = lookup.response,
                             outageGuidance = lookup.message,
-                            outageStreetOptions = lookup.availableStreets,
-                            outageBuildingOptions = lookup.availableBuildings,
+                            outageStreetOptions = lookup.availableStreets.ifEmpty {
+                                current.outageStreetOptions
+                            },
+                            outageBuildingOptions = lookup.availableBuildings.ifEmpty {
+                                current.outageBuildingOptions
+                            },
                             outageError = null,
                         )
                     },

@@ -2,10 +2,13 @@ package com.example.smallcityapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+val EffervescentBlue = Color(0xFF1B355E)
+val SportGreen = Color(0xFF00B18A)
+val HolidayBlue = Color(0xFF00BED6)
+val FullYellow = Color(0xFFFFC557)
+val CoralOrange = Color(0xFFEA6852)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val BrandLightBackground = Color(0xFFF7FAFC)
+val BrandLightSurface = Color(0xFFFFFFFF)
+val BrandDarkBackground = Color(0xFF091426)
+val BrandDarkSurface = Color(0xFF10213A)

@@ -10,8 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,8 +23,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -53,8 +58,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,6 +76,7 @@ import com.example.smallcityapp.data.NotificationMessage
 import com.example.smallcityapp.data.OutagePeriod
 import com.example.smallcityapp.data.OutageResponse
 import com.example.smallcityapp.ui.theme.SmallCityAPPTheme
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -82,8 +90,20 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SmallCityAPPTheme {
+                var showSplash by remember { mutableStateOf(true) }
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 val snackbarHostState = remember { SnackbarHostState() }
+
+                LaunchedEffect(Unit) {
+                    delay(1_000)
+                    showSplash = false
+                }
+
+                if (showSplash) {
+                    BrandSplashScreen()
+                    return@SmallCityAPPTheme
+                }
+
                 RequestNotificationPermission()
 
                 LaunchedEffect(uiState.firebaseError, uiState.historyError, uiState.outageError) {
@@ -177,6 +197,39 @@ private fun RequestNotificationPermission() {
     LaunchedEffect(Unit) {
         launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
+}
+
+@Composable
+private fun BrandSplashScreen() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center,
+    ) {
+        BrandLogo(
+            modifier = Modifier.size(180.dp),
+            alpha = 1f,
+        )
+    }
+}
+
+@Composable
+private fun BrandLogo(
+    modifier: Modifier = Modifier,
+    alpha: Float,
+) {
+    val logoRes = if (isSystemInDarkTheme()) {
+        R.drawable.logo_dark_theme
+    } else {
+        R.drawable.logo_light_theme
+    }
+    Image(
+        painter = painterResource(logoRes),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Fit,
+    )
 }
 
 @Composable
@@ -425,13 +478,12 @@ private fun OutagesScreen(
                 }
             }
         }
-        item {
+        if (uiState.outageStreetOptions.isNotEmpty()) {
+            item {
             ExposedDropdownMenuBox(
                 expanded = streetDropdownExpanded,
                 onExpandedChange = { expanded ->
-                    if (uiState.outageStreetOptions.isNotEmpty()) {
-                        streetDropdownExpanded = expanded
-                    }
+                    streetDropdownExpanded = expanded
                 },
             ) {
                 OutlinedTextField(
@@ -443,12 +495,9 @@ private fun OutagesScreen(
                     label = { Text("Вулиця, якщо потрібна") },
                     placeholder = { Text("Обери вулицю") },
                     readOnly = true,
-                    enabled = uiState.outageStreetOptions.isNotEmpty(),
                     singleLine = true,
                     trailingIcon = {
-                        if (uiState.outageStreetOptions.isNotEmpty()) {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = streetDropdownExpanded)
-                        }
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = streetDropdownExpanded)
                     },
                 )
                 DropdownMenu(
@@ -467,13 +516,13 @@ private fun OutagesScreen(
                 }
             }
         }
-        item {
+        }
+        if (uiState.outageBuildingOptions.isNotEmpty()) {
+            item {
             ExposedDropdownMenuBox(
                 expanded = buildingDropdownExpanded,
                 onExpandedChange = { expanded ->
-                    if (uiState.outageBuildingOptions.isNotEmpty()) {
-                        buildingDropdownExpanded = expanded
-                    }
+                    buildingDropdownExpanded = expanded
                 },
             ) {
                 OutlinedTextField(
@@ -485,12 +534,9 @@ private fun OutagesScreen(
                     label = { Text("Будинок, якщо потрібен") },
                     placeholder = { Text("Обери будинок") },
                     readOnly = true,
-                    enabled = uiState.outageBuildingOptions.isNotEmpty(),
                     singleLine = true,
                     trailingIcon = {
-                        if (uiState.outageBuildingOptions.isNotEmpty()) {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = buildingDropdownExpanded)
-                        }
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = buildingDropdownExpanded)
                     },
                 )
                 DropdownMenu(
@@ -508,6 +554,7 @@ private fun OutagesScreen(
                     }
                 }
             }
+        }
         }
         uiState.outageGuidance?.let { guidance ->
             item {
