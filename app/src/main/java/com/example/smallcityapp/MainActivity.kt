@@ -620,12 +620,13 @@ private fun OutagesScreen(
                     }
                 }
             }
-            if (result.periods.isEmpty()) {
+            val outagePeriods = result.periods.orEmpty().filterNotNull()
+            if (outagePeriods.isEmpty()) {
                 item {
                     EmptyCard("Для цієї адреси зараз немає доступного графіка відключень.")
                 }
             } else {
-                items(result.periods) { period ->
+                items(outagePeriods) { period ->
                     OutagePeriodCard(period)
                 }
             }
@@ -851,7 +852,10 @@ private fun TownTab.symbol(): String = when (this) {
     TownTab.Links -> "\uD83D\uDD17"
 }
 
-private fun formatIsoDateTime(value: String): String {
+private fun formatIsoDateTime(value: String?): String {
+    if (value.isNullOrBlank()) {
+        return "невідомо"
+    }
     return runCatching {
         val instant = Instant.parse(value)
         DATE_TIME_FORMATTER.format(instant.atZone(ZoneId.systemDefault()))

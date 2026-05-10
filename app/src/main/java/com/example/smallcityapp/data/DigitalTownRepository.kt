@@ -66,7 +66,9 @@ class DigitalTownRepository(
             val response = api.getOutages(request)
             if (response.isSuccessful) {
                 OutageLookupState(
-                    response = response.body() ?: error("Порожня відповідь сервера"),
+                    response = response.body()
+                        ?.withFallbackAddress(request)
+                        ?: error("Порожня відповідь сервера"),
                 )
             } else {
                 val payload = parseOutageError(response.errorBody()?.string())
@@ -122,5 +124,13 @@ class DigitalTownRepository(
                 jsonArray.optString(index)
             }.filter { it.isNotBlank() }
         }
+
+        private fun OutageResponse.withFallbackAddress(request: OutageLookupRequest): OutageResponse =
+            copy(
+                city = city?.takeIf { it.isNotBlank() } ?: request.city,
+                street = street?.takeIf { it.isNotBlank() } ?: request.street,
+                building = building?.takeIf { it.isNotBlank() } ?: request.building,
+                periods = periods.orEmpty().filterNotNull(),
+            )
     }
 }
