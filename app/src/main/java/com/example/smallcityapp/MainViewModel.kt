@@ -1,6 +1,7 @@
 package com.example.smallcityapp
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smallcityapp.data.DigitalTownRepository
@@ -12,6 +13,7 @@ import com.example.smallcityapp.data.OutageLookupRequest
 import com.example.smallcityapp.data.OutageResponse
 import com.example.smallcityapp.notifications.FirebaseTokenProvider
 import com.example.smallcityapp.notifications.LocalPushStore
+import com.google.gson.Gson
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,8 +63,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = DigitalTownRepository()
     private val pushStore = LocalPushStore(application)
     private val tokenProvider = FirebaseTokenProvider(application)
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val gson = Gson()
 
-    private val _uiState = MutableStateFlow(MainUiState())
+    private val _uiState = MutableStateFlow(loadSavedState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     init {
@@ -92,6 +96,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 outageError = null,
             )
         }
+        saveOutageSelection(_uiState.value)
         resolveOutageSelection()
     }
 
@@ -108,6 +113,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 outageError = null,
             )
         }
+        saveOutageSelection(_uiState.value)
         resolveOutageSelection()
     }
 
@@ -122,6 +128,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 outageError = null,
             )
         }
+        saveOutageSelection(_uiState.value)
         resolveOutageSelection()
     }
 
@@ -230,11 +237,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ),
             )
             _uiState.update {
-                it.copy(
+                val nextState = it.copy(
                     outageLoading = false,
                     outageResult = result.getOrNull(),
                     outageError = result.exceptionOrNull()?.localizedMessage,
                 )
+                saveOutageSelection(nextState)
+                nextState
             }
         }
     }
@@ -276,7 +285,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { current ->
                 result.fold(
                     onSuccess = { lookup ->
-                        current.copy(
+                        val nextState = current.copy(
                             outageLoading = false,
                             outageResult = lookup.response,
                             outageGuidance = lookup.message,
@@ -288,6 +297,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             },
                             outageError = null,
                         )
+                        saveOutageSelection(nextState)
+                        nextState
                     },
                     onFailure = { error ->
                         current.copy(
@@ -298,5 +309,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
         }
+    }
+
+    private fun loadSavedState(): MainUiState {
+        val savedResult = prefs.getString(KEY_OUTAGE_RESULT, null)
+            ?.let { rawResult ->
+                runCatching { gson.fromJson(rawResult, OutageResponse::class.java) }.getOrNull()
+            }
+
+        return MainUiState(
+            outageCity = prefs.getString(KEY_OUTAGE_CITY, "").orEmpty(),
+            outageStreet = prefs.getString(KEY_OUTAGE_STREET, "").orEmpty(),
+            outageBuilding = prefs.getString(KEY_OUTAGE_BUILDING, "").orEmpty(),
+            outageResult = savedResult,
+        )
+    }
+
+    private fun saveOutageSelection(state: MainUiState) {
+        prefs.edit()
+            .putString(KEY_OUTAGE_CITY, state.outageCity)
+            .putString(KEY_OUTAGE_STREET, state.outageStreet)
+            .putString(KEY_OUTAGE_BUILDING, state.outageBuilding)
+            .apply {
+                val result = state.outageResult
+                if (result?.addressId != null) {
+                    putString(KEY_OUTAGE_RESULT, gson.toJson(result))
+                } else {
+                    remove(KEY_OUTAGE_RESULT)
+                }
+            }
+            .apply()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "main_state"
+        private const val KEY_OUTAGE_CITY = "outage_city"
+        private const val KEY_OUTAGE_STREET = "outage_street"
+        private const val KEY_OUTAGE_BUILDING = "outage_building"
+        private const val KEY_OUTAGE_RESULT = "outage_result"
     }
 }

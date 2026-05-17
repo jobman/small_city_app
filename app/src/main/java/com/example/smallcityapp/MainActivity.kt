@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,6 +51,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -201,10 +203,16 @@ private fun RequestNotificationPermission() {
 
 @Composable
 private fun BrandSplashScreen() {
+    val splashBackground = if (isSystemInDarkTheme()) {
+        Color(0xFF052858)
+    } else {
+        Color.White
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(splashBackground),
         contentAlignment = Alignment.Center,
     ) {
         BrandLogo(
@@ -320,11 +328,11 @@ private fun HistoryScreen(
             item {
                 StatusCard(
                     title = "Обрана адреса",
-                    body = buildString {
-                        append(listOfNotNull(uiState.outageResult.city, uiState.outageResult.street, uiState.outageResult.building).joinToString(", "))
-                        append("\n")
-                        append("address_id=${uiState.outageResult.addressId}")
-                    },
+                    body = listOfNotNull(
+                        uiState.outageResult.city,
+                        uiState.outageResult.street,
+                        uiState.outageResult.building,
+                    ).joinToString(", "),
                 )
             }
         }
@@ -366,9 +374,9 @@ private fun HistoryScreen(
                 )
             }
         }
-        if (uiState.historyMessages.isEmpty()) {
+        if (!uiState.historyLoading && uiState.historyMessages.isEmpty()) {
             item {
-                EmptyCard("Тут буде показана історія повідомлень для обраної адреси.")
+                EmptyCard("Повідомлень для цієї адреси поки немає. Коли з'являться нові оновлення, вони будуть тут.")
             }
         } else {
             items(uiState.historyMessages) { message ->
@@ -640,6 +648,8 @@ private fun NewsScreen(
     uiState: MainUiState,
     onRefresh: () -> Unit,
 ) {
+    var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -659,9 +669,41 @@ private fun NewsScreen(
             }
         } else {
             items(uiState.news) { news ->
-                NewsCard(news)
+                NewsCard(
+                    news = news,
+                    onClick = { selectedNews = news },
+                )
             }
         }
+    }
+
+    selectedNews?.let { news ->
+        AlertDialog(
+            onDismissRequest = { selectedNews = null },
+            confirmButton = {
+                TextButton(onClick = { selectedNews = null }) {
+                    Text("Закрити")
+                }
+            },
+            title = {
+                Text(news.title)
+            },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        Text(news.content)
+                    }
+                    item {
+                        Text(
+                            text = formatIsoDateTime(news.date),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+        )
     }
 }
 
@@ -804,8 +846,15 @@ private fun OutagePeriodCard(period: OutagePeriod) {
 }
 
 @Composable
-private fun NewsCard(news: NewsItem) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun NewsCard(
+    news: NewsItem,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
