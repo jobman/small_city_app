@@ -183,40 +183,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         viewModelScope.launch {
-            _uiState.update { it.copy(historyLoading = true, historyError = null) }
-
-            val tokenResult = if (uiState.value.firebaseToken.isBlank()) {
-                tokenProvider.getToken()
-            } else {
-                Result.success(uiState.value.firebaseToken)
-            }
-
-            val token = tokenResult.getOrNull()
-            if (token.isNullOrBlank()) {
-                _uiState.update {
-                    it.copy(
-                        historyLoading = false,
-                        historyError = tokenResult.exceptionOrNull()?.localizedMessage
-                            ?: "Не вдалося отримати Firebase token",
-                    )
-                }
-                return@launch
-            }
-
-            val result = repository.getHistory(
-                addressId = addressId,
-                firebaseToken = token,
-                lastDate = uiState.value.historyLastDate,
-            )
-
-            _uiState.update {
-                it.copy(
-                    historyLoading = false,
-                    historyMessages = result.getOrDefault(emptyList()),
-                    historyError = result.exceptionOrNull()?.localizedMessage,
-                    firebaseToken = token,
-                )
-            }
+            loadHistoryForAddress(addressId = addressId, showLoading = true)
         }
     }
 
@@ -244,6 +211,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 saveOutageSelection(nextState)
                 nextState
+            }
+            result.getOrNull()?.addressId?.let { addressId ->
+                loadHistoryForAddress(addressId = addressId, showLoading = false)
             }
         }
     }
@@ -282,6 +252,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 ),
             )
 
+            var selectedAddressId: Int? = null
             _uiState.update { current ->
                 result.fold(
                     onSuccess = { lookup ->
@@ -298,6 +269,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             outageError = null,
                         )
                         saveOutageSelection(nextState)
+                        selectedAddressId = nextState.outageResult?.addressId
                         nextState
                     },
                     onFailure = { error ->
@@ -308,6 +280,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     },
                 )
             }
+            selectedAddressId?.let { addressId ->
+                loadHistoryForAddress(addressId = addressId, showLoading = false)
+            }
+        }
+    }
+
+    private suspend fun loadHistoryForAddress(addressId: Int, showLoading: Boolean) {
+        if (showLoading) {
+            _uiState.update { it.copy(historyLoading = true, historyError = null) }
+        }
+
+        val tokenResult = if (uiState.value.firebaseToken.isBlank()) {
+            tokenProvider.getToken()
+        } else {
+            Result.success(uiState.value.firebaseToken)
+        }
+
+        val token = tokenResult.getOrNull()
+        if (token.isNullOrBlank()) {
+            _uiState.update {
+                it.copy(
+                    historyLoading = false,
+                    historyError = tokenResult.exceptionOrNull()?.localizedMessage
+                        ?: "Не вдалося отримати Firebase token",
+                )
+            }
+            return
+        }
+
+        val result = repository.getHistory(
+            addressId = addressId,
+            firebaseToken = token,
+            lastDate = uiState.value.historyLastDate,
+        )
+
+        _uiState.update {
+            it.copy(
+                historyLoading = false,
+                historyMessages = result.getOrDefault(emptyList()),
+                historyError = result.exceptionOrNull()?.localizedMessage,
+                firebaseToken = token,
+            )
         }
     }
 
