@@ -20,7 +20,6 @@ interface DigitalTownApi {
     suspend fun getNotificationHistory(
         @Query("address_id") addressId: Int,
         @Query("firebase_token") firebaseToken: String,
-        @Query("last_date") lastDate: String? = null,
     ): NotificationHistoryResponse
 
     @POST("outages/city-outage/")

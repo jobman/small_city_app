@@ -26,12 +26,10 @@ class DigitalTownRepository(
     suspend fun getHistory(
         addressId: Int,
         firebaseToken: String,
-        lastDate: String?,
     ): Result<List<NotificationMessage>> = runCatching {
         api.getNotificationHistory(
             addressId = addressId,
             firebaseToken = firebaseToken,
-            lastDate = lastDate?.takeIf { it.isNotBlank() },
         ).messages
     }
 

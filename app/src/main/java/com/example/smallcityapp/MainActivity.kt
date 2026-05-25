@@ -10,6 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,28 +30,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -70,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.rememberDatePickerState
 import com.example.smallcityapp.data.ExternalLinkItem
 import com.example.smallcityapp.data.LocalPushMessage
 import com.example.smallcityapp.data.NewsItem
@@ -80,7 +77,6 @@ import com.example.smallcityapp.data.OutageResponse
 import com.example.smallcityapp.ui.theme.SmallCityAPPTheme
 import kotlinx.coroutines.delay
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -115,6 +111,21 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(uiState.selectedTab) {
+                    while (true) {
+                        when (uiState.selectedTab) {
+                            TownTab.Notifications -> viewModel.refreshNotifications()
+                            TownTab.News,
+                            TownTab.Links -> viewModel.refreshDashboard()
+                            TownTab.Outages -> Unit
+                        }
+                        if (uiState.selectedTab == TownTab.Outages) {
+                            break
+                        }
+                        delay(NOTIFICATIONS_REFRESH_INTERVAL_MS)
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -146,15 +157,6 @@ class MainActivity : ComponentActivity() {
                         TownTab.Notifications -> NotificationsScreen(
                             modifier = Modifier.padding(innerPadding),
                             uiState = uiState,
-                            onRefresh = viewModel::refreshDashboard,
-                            onRefreshPushes = viewModel::refreshReceivedPushes,
-                        )
-
-                        TownTab.History -> HistoryScreen(
-                            modifier = Modifier.padding(innerPadding),
-                            uiState = uiState,
-                            onLastDateChange = viewModel::updateHistoryLastDate,
-                            onLoadHistory = viewModel::loadHistory,
                         )
 
                         TownTab.Outages -> OutagesScreen(
@@ -170,13 +172,11 @@ class MainActivity : ComponentActivity() {
                         TownTab.News -> NewsScreen(
                             modifier = Modifier.padding(innerPadding),
                             uiState = uiState,
-                            onRefresh = viewModel::refreshDashboard,
                         )
 
                         TownTab.Links -> LinksScreen(
                             modifier = Modifier.padding(innerPadding),
                             uiState = uiState,
-                            onRefresh = viewModel::refreshDashboard,
                         )
                     }
                 }
@@ -244,8 +244,6 @@ private fun BrandLogo(
 private fun NotificationsScreen(
     modifier: Modifier = Modifier,
     uiState: MainUiState,
-    onRefresh: () -> Unit,
-    onRefreshPushes: () -> Unit,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -253,29 +251,19 @@ private fun NotificationsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionHeader(
-                title = "Стан зараз",
-                actionLabel = "Оновити",
-                onAction = onRefresh,
-                isLoading = uiState.isRefreshing,
+            Text(
+                text = "Сповіщення",
+                style = MaterialTheme.typography.headlineSmall,
             )
         }
         item {
-            StatusCard(
-                title = "Тривога",
-                body = when (uiState.alarmActive) {
-                    true -> "Зараз активна повітряна тривога. Будь ласка, подбай про безпеку."
-                    false -> "Наразі активної повітряної тривоги немає."
-                    null -> "Оновлюємо інформацію про тривогу."
-                },
-            )
+            AlarmStatusCard(alarmActive = uiState.alarmActive)
         }
         item {
-            SectionHeader(
-                title = "Останні сповіщення",
-                actionLabel = "Оновити",
-                onAction = onRefreshPushes,
-                isLoading = false,
+            Text(
+                text = "Нові push",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
         }
         if (uiState.localPushes.isEmpty()) {
@@ -287,37 +275,11 @@ private fun NotificationsScreen(
                 PushMessageCard(push)
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun HistoryScreen(
-    modifier: Modifier = Modifier,
-    uiState: MainUiState,
-    onLastDateChange: (String) -> Unit,
-    onLoadHistory: () -> Unit,
-) {
-    var showDatePicker by remember { mutableStateOf(false) }
-    val initialSelectedDateMillis = remember(uiState.historyLastDate) {
-        parseHistoryDateMillis(uiState.historyLastDate)
-    }
-
-    LaunchedEffect(uiState.outageResult?.addressId, uiState.historyLastDate) {
-        if (uiState.outageResult?.addressId != null) {
-            onLoadHistory()
-        }
-    }
-
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
         item {
             Text(
-                text = "Історія повідомлень",
-                style = MaterialTheme.typography.headlineSmall,
+                text = "Історія повідомлень за останній місяць",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
         }
         if (uiState.outageResult?.addressId == null) {
@@ -336,36 +298,6 @@ private fun HistoryScreen(
                 )
             }
         }
-        item {
-            OutlinedTextField(
-                value = formatHistoryDateForDisplay(uiState.historyLastDate),
-                onValueChange = {},
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Дата за бажанням") },
-                supportingText = { Text("Якщо дату не обирати, буде завантажено повідомлення за останній місяць") },
-                readOnly = true,
-                singleLine = true,
-            )
-        }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                OutlinedButton(
-                    onClick = { showDatePicker = true },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Обрати дату")
-                }
-                OutlinedButton(
-                    onClick = { onLastDateChange("") },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Очистити")
-                }
-            }
-        }
         if (uiState.historyLoading) {
             item {
                 StatusCard(
@@ -382,36 +314,6 @@ private fun HistoryScreen(
             items(uiState.historyMessages) { message ->
                 MessageCard(message)
             }
-        }
-    }
-
-    if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialSelectedDateMillis,
-        )
-
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                FilledTonalButton(
-                    onClick = {
-                        val selectedMillis = datePickerState.selectedDateMillis
-                        if (selectedMillis != null) {
-                            onLastDateChange(historyDateToIsoString(selectedMillis))
-                        }
-                        showDatePicker = false
-                    },
-                ) {
-                    Text("Готово")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showDatePicker = false }) {
-                    Text("Скасувати")
-                }
-            },
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 }
@@ -646,7 +548,6 @@ private fun OutagesScreen(
 private fun NewsScreen(
     modifier: Modifier = Modifier,
     uiState: MainUiState,
-    onRefresh: () -> Unit,
 ) {
     var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
 
@@ -656,11 +557,9 @@ private fun NewsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionHeader(
-                title = "Новини громади",
-                actionLabel = "Оновити",
-                onAction = onRefresh,
-                isLoading = uiState.isRefreshing,
+            Text(
+                text = "Новини громади",
+                style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (uiState.news.isEmpty()) {
@@ -678,32 +577,66 @@ private fun NewsScreen(
     }
 
     selectedNews?.let { news ->
-        AlertDialog(
-            onDismissRequest = { selectedNews = null },
-            confirmButton = {
-                TextButton(onClick = { selectedNews = null }) {
-                    Text("Закрити")
-                }
-            },
-            title = {
-                Text(news.title)
-            },
-            text = {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item {
-                        Text(news.content)
-                    }
-                    item {
-                        Text(
-                            text = formatIsoDateTime(news.date),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            },
+        NewsDetailsDialog(
+            news = news,
+            onDismiss = { selectedNews = null },
         )
+    }
+}
+
+@Composable
+private fun NewsDetailsDialog(
+    news: NewsItem,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+        ),
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text("Закрити")
+                        }
+                    }
+                }
+                item {
+                    Text(
+                        text = news.title.breakLongWords(),
+                        modifier = Modifier.fillMaxWidth(),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                item {
+                    Text(
+                        text = formatIsoDateTime(news.date),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                item {
+                    Text(
+                        text = news.content,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -711,7 +644,6 @@ private fun NewsScreen(
 private fun LinksScreen(
     modifier: Modifier = Modifier,
     uiState: MainUiState,
-    onRefresh: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
     LazyColumn(
@@ -720,11 +652,9 @@ private fun LinksScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            SectionHeader(
-                title = "Корисні посилання",
-                actionLabel = "Оновити",
-                onAction = onRefresh,
-                isLoading = uiState.isRefreshing,
+            Text(
+                text = "Корисні посилання",
+                style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (uiState.links.isEmpty()) {
@@ -740,43 +670,42 @@ private fun LinksScreen(
 }
 
 @Composable
-private fun SectionHeader(
-    title: String,
-    actionLabel: String,
-    onAction: () -> Unit,
-    isLoading: Boolean,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        FilledTonalButton(
-            onClick = onAction,
-            enabled = !isLoading,
-            modifier = Modifier.padding(start = 12.dp),
-        ) {
-            Text(actionLabel)
-        }
+private fun AlarmStatusCard(alarmActive: Boolean?) {
+    val containerColor = when (alarmActive) {
+        true -> MaterialTheme.colorScheme.errorContainer
+        false -> MaterialTheme.colorScheme.secondaryContainer
+        null -> MaterialTheme.colorScheme.surfaceVariant
     }
+    val contentColor = when (alarmActive) {
+        true -> MaterialTheme.colorScheme.onErrorContainer
+        false -> MaterialTheme.colorScheme.onSecondaryContainer
+        null -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    StatusCard(
+        title = "Тривога",
+        body = when (alarmActive) {
+            true -> "Зараз активна повітряна тривога. Будь ласка, подбай про безпеку."
+            false -> "Наразі активної повітряної тривоги немає."
+            null -> "Оновлюємо інформацію про тривогу."
+        },
+        containerColor = containerColor,
+        contentColor = contentColor,
+    )
 }
 
 @Composable
 private fun StatusCard(
     title: String,
     body: String,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            containerColor = containerColor,
+            contentColor = contentColor,
         ),
     ) {
         Column(
@@ -834,13 +763,41 @@ private fun MessageCard(message: NotificationMessage) {
 
 @Composable
 private fun OutagePeriodCard(period: OutagePeriod) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val periodStatus = period.status()
+    val containerColor = when (periodStatus) {
+        OutagePeriodStatus.PowerOn -> MaterialTheme.colorScheme.secondaryContainer
+        OutagePeriodStatus.PowerOff -> MaterialTheme.colorScheme.errorContainer
+        OutagePeriodStatus.ScheduledOutage -> MaterialTheme.colorScheme.tertiaryContainer
+        OutagePeriodStatus.Unknown -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    val contentColor = when (periodStatus) {
+        OutagePeriodStatus.PowerOn -> MaterialTheme.colorScheme.onSecondaryContainer
+        OutagePeriodStatus.PowerOff -> MaterialTheme.colorScheme.onErrorContainer
+        OutagePeriodStatus.ScheduledOutage -> MaterialTheme.colorScheme.onTertiaryContainer
+        OutagePeriodStatus.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+        ),
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("З ${formatIsoDateTime(period.from)} до ${formatIsoDateTime(period.to)}")
-            Text("Тривалість відключення: ${period.duration}")
+            Text(
+                text = periodStatus.title,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text("Час: ${period.formatTimeRange()}")
+            period.duration
+                ?.takeIf { it.isNotBlank() && it.uppercase() !in OUTAGE_STATUS_VALUES }
+                ?.let { duration ->
+                    Text("Тривалість відключення: $duration")
+                }
         }
     }
 }
@@ -859,7 +816,12 @@ private fun NewsCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(news.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                text = news.title.breakLongWords(),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
             Text(
                 text = news.content,
                 maxLines = 8,
@@ -895,7 +857,6 @@ private fun LinkCard(
 
 private fun TownTab.symbol(): String = when (this) {
     TownTab.Notifications -> "\uD83D\uDD14"
-    TownTab.History -> "\uD83D\uDCDC"
     TownTab.Outages -> "\u26A1"
     TownTab.News -> "\uD83D\uDCF0"
     TownTab.Links -> "\uD83D\uDD17"
@@ -911,36 +872,61 @@ private fun formatIsoDateTime(value: String?): String {
     }.getOrDefault(value)
 }
 
-private fun formatHistoryDateForDisplay(value: String): String {
-    if (value.isBlank()) {
-        return ""
+private fun OutagePeriod.status(): OutagePeriodStatus {
+    return when (duration?.trim()?.uppercase()) {
+        "ON" -> OutagePeriodStatus.PowerOn
+        "OFF" -> OutagePeriodStatus.PowerOff
+        null, "" -> OutagePeriodStatus.Unknown
+        else -> OutagePeriodStatus.ScheduledOutage
     }
-    return runCatching {
-        val instant = Instant.parse(value)
-        HISTORY_DATE_FORMATTER.format(instant.atZone(ZoneId.systemDefault()).toLocalDate())
-    }.getOrDefault(value)
 }
 
-private fun parseHistoryDateMillis(value: String): Long? {
-    if (value.isBlank()) {
+private fun OutagePeriod.formatTimeRange(): String {
+    val fromTime = from.formatOutageTime()
+    val toTime = to.formatOutageTime()
+    return when {
+        fromTime == "00:00" && toTime == "24:00" -> "увесь день"
+        fromTime != null && toTime != null -> "з $fromTime до $toTime"
+        fromTime != null -> "з $fromTime"
+        toTime != null -> "до $toTime"
+        else -> "невідомо"
+    }
+}
+
+private fun String?.formatOutageTime(): String? {
+    if (isNullOrBlank()) {
         return null
     }
+    val value = trim()
     return runCatching {
-        Instant.parse(value).toEpochMilli()
-    }.getOrNull()
-}
-
-private fun historyDateToIsoString(selectedMillis: Long): String {
-    return Instant.ofEpochMilli(selectedMillis)
-        .atZone(ZoneId.systemDefault())
-        .toLocalDate()
-        .atStartOfDay(ZoneId.systemDefault())
-        .toInstant()
-        .toString()
+        val instant = Instant.parse(value)
+        DATE_TIME_FORMATTER.format(instant.atZone(ZoneId.systemDefault()))
+    }.getOrElse {
+        value
+    }
 }
 
 private val DATE_TIME_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 
-private val HISTORY_DATE_FORMATTER: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private enum class OutagePeriodStatus(val title: String) {
+    PowerOn("Світло є"),
+    PowerOff("Світла немає"),
+    ScheduledOutage("Планове відключення"),
+    Unknown("Статус графіка"),
+}
+
+private fun String.breakLongWords(maxChunkLength: Int = 16): String {
+    return splitToSequence(' ')
+        .joinToString(" ") { word ->
+            if (word.length <= maxChunkLength) {
+                word
+            } else {
+                word.chunked(maxChunkLength).joinToString(ZERO_WIDTH_SPACE)
+            }
+        }
+}
+
+private val OUTAGE_STATUS_VALUES = setOf("ON", "OFF")
+private const val NOTIFICATIONS_REFRESH_INTERVAL_MS = 5 * 60 * 1_000L
+private const val ZERO_WIDTH_SPACE = "\u200B"

@@ -24,7 +24,6 @@ import kotlinx.coroutines.launch
 
 enum class TownTab(val title: String) {
     Notifications("Сповіщ."),
-    History("Історія"),
     Outages("Графік"),
     News("Новини"),
     Links("Ще"),
@@ -42,7 +41,6 @@ data class MainUiState(
     val newsError: String? = null,
     val links: List<ExternalLinkItem> = emptyList(),
     val linksError: String? = null,
-    val historyLastDate: String = "",
     val historyMessages: List<NotificationMessage> = emptyList(),
     val historyLoading: Boolean = false,
     val historyError: String? = null,
@@ -75,10 +73,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: TownTab) {
         _uiState.update { it.copy(selectedTab = tab) }
-    }
-
-    fun updateHistoryLastDate(value: String) {
-        _uiState.update { it.copy(historyLastDate = value) }
     }
 
     fun updateOutageCity(value: String) {
@@ -173,17 +167,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(localPushes = pushStore.getMessages()) }
     }
 
-    fun loadHistory() {
-        val addressId = uiState.value.outageResult?.addressId
-        if (addressId == null) {
-            _uiState.update {
-                it.copy(historyError = "Спочатку обери адресу на екрані графіка відключень")
+    fun refreshNotifications() {
+        refreshReceivedPushes()
+        refreshDashboard()
+        uiState.value.outageResult?.addressId?.let { addressId ->
+            viewModelScope.launch {
+                loadHistoryForAddress(addressId = addressId, showLoading = true)
             }
-            return
-        }
-
-        viewModelScope.launch {
-            loadHistoryForAddress(addressId = addressId, showLoading = true)
         }
     }
 
@@ -312,7 +302,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val result = repository.getHistory(
             addressId = addressId,
             firebaseToken = token,
-            lastDate = uiState.value.historyLastDate,
         )
 
         _uiState.update {
