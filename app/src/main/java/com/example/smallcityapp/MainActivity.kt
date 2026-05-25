@@ -298,21 +298,23 @@ private fun NotificationsScreen(
                 )
             }
         }
-        if (uiState.historyLoading) {
-            item {
-                StatusCard(
-                    title = "Оновлення",
-                    body = "Завантажуємо повідомлення для обраної адреси.",
-                )
+        if (uiState.outageResult?.addressId != null) {
+            if (uiState.historyLoading) {
+                item {
+                    StatusCard(
+                        title = "Оновлення",
+                        body = "Завантажуємо повідомлення для обраної адреси.",
+                    )
+                }
             }
-        }
-        if (!uiState.historyLoading && uiState.historyMessages.isEmpty()) {
-            item {
-                EmptyCard("Повідомлень для цієї адреси поки немає. Коли з'являться нові оновлення, вони будуть тут.")
-            }
-        } else {
-            items(uiState.historyMessages) { message ->
-                MessageCard(message)
+            if (!uiState.historyLoading && uiState.historyMessages.isEmpty()) {
+                item {
+                    EmptyCard("Повідомлень для цієї адреси поки немає. Коли з'являться нові оновлення, вони будуть тут.")
+                }
+            } else {
+                items(uiState.historyMessages) { message ->
+                    MessageCard(message)
+                }
             }
         }
     }
