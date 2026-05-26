@@ -146,7 +146,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             @Suppress("UNCHECKED_CAST")
             val tokenResult = results[3] as Result<String>
 
+            var reloadHistoryAfterPushExpiry: Int? = null
             _uiState.update { state ->
+                val localPushResult = pushStore.getMessagesResult()
+                if (localPushResult.removedExpired) {
+                    reloadHistoryAfterPushExpiry = state.outageResult?.addressId
+                }
                 state.copy(
                     isRefreshing = false,
                     alarmActive = alarmResult.getOrNull(),
@@ -157,22 +162,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     linksError = linksResult.exceptionOrNull()?.localizedMessage,
                     firebaseToken = tokenResult.getOrNull().orEmpty(),
                     firebaseError = tokenResult.exceptionOrNull()?.localizedMessage,
-                    localPushes = pushStore.getMessages(),
+                    localPushes = localPushResult.messages,
+                    historyMessages = state.historyMessages.withoutActivePushDuplicates(localPushResult.messages),
                 )
+            }
+            reloadHistoryAfterPushExpiry?.let { addressId ->
+                loadHistoryForAddress(addressId = addressId, showLoading = false)
             }
         }
     }
 
     fun refreshReceivedPushes() {
-        _uiState.update { it.copy(localPushes = pushStore.getMessages()) }
+        refreshReceivedPushes(reloadHistoryOnExpiry = true)
     }
 
     fun refreshNotifications() {
-        refreshReceivedPushes()
+        refreshReceivedPushes(reloadHistoryOnExpiry = false)
         refreshDashboard()
         uiState.value.outageResult?.addressId?.let { addressId ->
             viewModelScope.launch {
                 loadHistoryForAddress(addressId = addressId, showLoading = true)
+            }
+        }
+    }
+
+    private fun refreshReceivedPushes(reloadHistoryOnExpiry: Boolean) {
+        val localPushResult = pushStore.getMessagesResult()
+        var reloadHistoryAfterPushExpiry: Int? = null
+        _uiState.update { state ->
+            if (reloadHistoryOnExpiry && localPushResult.removedExpired) {
+                reloadHistoryAfterPushExpiry = state.outageResult?.addressId
+            }
+            state.copy(
+                localPushes = localPushResult.messages,
+                historyMessages = state.historyMessages.withoutActivePushDuplicates(localPushResult.messages),
+            )
+        }
+        reloadHistoryAfterPushExpiry?.let { addressId ->
+            viewModelScope.launch {
+                loadHistoryForAddress(addressId = addressId, showLoading = false)
             }
         }
     }
@@ -305,9 +333,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         )
 
         _uiState.update {
+            val localPushes = it.localPushes
             it.copy(
                 historyLoading = false,
-                historyMessages = result.getOrDefault(emptyList()),
+                historyMessages = result.getOrDefault(emptyList()).withoutActivePushDuplicates(localPushes),
                 historyError = result.exceptionOrNull()?.localizedMessage,
                 firebaseToken = token,
             )
@@ -351,4 +380,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val KEY_OUTAGE_BUILDING = "outage_building"
         private const val KEY_OUTAGE_RESULT = "outage_result"
     }
+}
+
+private fun List<NotificationMessage>.withoutActivePushDuplicates(
+    localPushes: List<LocalPushMessage>,
+): List<NotificationMessage> {
+    val activePushBodies = localPushes
+        .map { it.body.normalizedMessageText() }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    if (activePushBodies.isEmpty()) {
+        return this
+    }
+
+    return filterNot { message ->
+        message.content.normalizedMessageText() in activePushBodies
+    }
+}
+
+private fun String.normalizedMessageText(): String {
+    return trim().replace(Regex("\\s+"), " ")
 }

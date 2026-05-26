@@ -8,9 +8,12 @@ import org.json.JSONObject
 class LocalPushStore(context: Context) {
     private val preferences = context.getSharedPreferences("digital_town_pushes", Context.MODE_PRIVATE)
 
-    fun getMessages(): List<LocalPushMessage> {
-        val raw = preferences.getString(KEY_MESSAGES, null) ?: return emptyList()
-        return runCatching {
+    fun getMessages(): List<LocalPushMessage> = getMessagesResult().messages
+
+    fun getMessagesResult(): LocalPushMessagesResult {
+        val raw = preferences.getString(KEY_MESSAGES, null)
+            ?: return LocalPushMessagesResult(messages = emptyList(), removedExpired = false)
+        val savedMessages = runCatching {
             val array = JSONArray(raw)
             List(array.length()) { index ->
                 val item = array.getJSONObject(index)
@@ -21,6 +24,18 @@ class LocalPushStore(context: Context) {
                 )
             }
         }.getOrDefault(emptyList())
+
+        val freshMessages = savedMessages.filter { message ->
+            message.receivedAt >= System.currentTimeMillis() - MESSAGE_TTL_MS
+        }
+        val removedExpired = freshMessages.size != savedMessages.size
+        if (removedExpired) {
+            saveMessages(freshMessages)
+        }
+        return LocalPushMessagesResult(
+            messages = freshMessages,
+            removedExpired = removedExpired,
+        )
     }
 
     fun saveMessage(message: LocalPushMessage) {
@@ -29,8 +44,12 @@ class LocalPushStore(context: Context) {
             addAll(getMessages())
         }.take(MAX_MESSAGES)
 
+        saveMessages(updated)
+    }
+
+    private fun saveMessages(messages: List<LocalPushMessage>) {
         val serialized = JSONArray().apply {
-            updated.forEach { item ->
+            messages.forEach { item ->
                 put(
                     JSONObject()
                         .put("title", item.title)
@@ -57,5 +76,11 @@ class LocalPushStore(context: Context) {
         private const val KEY_MESSAGES = "messages"
         private const val KEY_TOKEN = "firebase_token"
         private const val MAX_MESSAGES = 30
+        private const val MESSAGE_TTL_MS = 12 * 60 * 60 * 1_000L
     }
 }
+
+data class LocalPushMessagesResult(
+    val messages: List<LocalPushMessage>,
+    val removedExpired: Boolean,
+)
