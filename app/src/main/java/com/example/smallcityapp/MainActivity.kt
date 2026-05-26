@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -603,8 +604,15 @@ private fun NewsDetailsDialog(
             color = MaterialTheme.colorScheme.background,
         ) {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(20.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .systemBarsPadding(),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    top = 20.dp,
+                    end = 20.dp,
+                    bottom = 40.dp,
+                ),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 item {
