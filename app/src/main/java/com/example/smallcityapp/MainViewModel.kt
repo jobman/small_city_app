@@ -21,16 +21,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.IOException
 
 enum class TownTab(val title: String) {
     Notifications("Сповіщ."),
     Outages("Графік"),
     News("Новини"),
     Links("Ще"),
+    Profile("Профіль"),
+}
+
+enum class AppTheme {
+    System,
+    Light,
+    Dark,
 }
 
 data class MainUiState(
     val selectedTab: TownTab = TownTab.Notifications,
+    val appTheme: AppTheme = AppTheme.System,
     val isRefreshing: Boolean = false,
     val alarmActive: Boolean? = null,
     val alarmError: String? = null,
@@ -73,6 +82,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectTab(tab: TownTab) {
         _uiState.update { it.copy(selectedTab = tab) }
+    }
+
+    fun updateAppTheme(theme: AppTheme) {
+        prefs.edit().putString(KEY_APP_THEME, theme.name).apply()
+        _uiState.update { it.copy(appTheme = theme) }
     }
 
     fun updateOutageCity(value: String) {
@@ -154,14 +168,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 state.copy(
                     isRefreshing = false,
-                    alarmActive = alarmResult.getOrNull(),
-                    alarmError = alarmResult.exceptionOrNull()?.localizedMessage,
-                    news = newsResult.getOrDefault(emptyList()),
-                    newsError = newsResult.exceptionOrNull()?.localizedMessage,
-                    links = linksResult.getOrDefault(emptyList()),
-                    linksError = linksResult.exceptionOrNull()?.localizedMessage,
-                    firebaseToken = tokenResult.getOrNull().orEmpty(),
-                    firebaseError = tokenResult.exceptionOrNull()?.localizedMessage,
+                    alarmActive = alarmResult.getOrNull() ?: state.alarmActive,
+                    alarmError = alarmResult.exceptionOrNull()?.toUserMessage(),
+                    news = newsResult.getOrNull() ?: state.news,
+                    newsError = newsResult.exceptionOrNull()?.toUserMessage(),
+                    links = linksResult.getOrNull() ?: state.links,
+                    linksError = linksResult.exceptionOrNull()?.toUserMessage(),
+                    firebaseToken = tokenResult.getOrNull() ?: state.firebaseToken,
+                    firebaseError = tokenResult.exceptionOrNull()?.toUserMessage(),
                     localPushes = localPushResult.messages,
                     historyMessages = state.historyMessages.withoutActivePushDuplicates(localPushResult.messages),
                 )
@@ -205,35 +219,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun loadOutages() {
-        val state = uiState.value
-        if (state.outageCity.isBlank()) {
-            _uiState.update { it.copy(outageError = "Поле міста є обов'язковим") }
-            return
-        }
-
-        viewModelScope.launch {
-            _uiState.update { it.copy(outageLoading = true, outageError = null, outageResult = null) }
-            val result = repository.getOutages(
-                OutageLookupRequest(
-                    city = state.outageCity.trim(),
-                    street = state.outageStreet.trim().ifBlank { null },
-                    building = state.outageBuilding.trim().ifBlank { null },
-                ),
-            )
-            _uiState.update {
-                val nextState = it.copy(
-                    outageLoading = false,
-                    outageResult = result.getOrNull(),
-                    outageError = result.exceptionOrNull()?.localizedMessage,
-                )
-                saveOutageSelection(nextState)
-                nextState
-            }
-            result.getOrNull()?.addressId?.let { addressId ->
-                loadHistoryForAddress(addressId = addressId, showLoading = false)
-            }
-        }
+    fun refreshOutages() {
+        resolveOutageSelection()
     }
 
     fun loadOutageCityOptions() {
@@ -247,8 +234,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     outageCityOptionsLoading = false,
-                    outageCityOptions = result.getOrDefault(emptyList()),
-                    outageError = result.exceptionOrNull()?.localizedMessage,
+                    outageCityOptions = result.getOrNull() ?: it.outageCityOptions,
+                    outageError = result.exceptionOrNull()?.toUserMessage(),
                 )
             }
         }
@@ -293,7 +280,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onFailure = { error ->
                         current.copy(
                             outageLoading = false,
-                            outageError = error.localizedMessage,
+                            outageError = error.toUserMessage(),
                         )
                     },
                 )
@@ -320,7 +307,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     historyLoading = false,
-                    historyError = tokenResult.exceptionOrNull()?.localizedMessage
+                    historyError = tokenResult.exceptionOrNull()?.toUserMessage()
                         ?: "Не вдалося отримати Firebase token",
                 )
             }
@@ -337,7 +324,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 historyLoading = false,
                 historyMessages = result.getOrDefault(emptyList()).withoutActivePushDuplicates(localPushes),
-                historyError = result.exceptionOrNull()?.localizedMessage,
+                historyError = result.exceptionOrNull()?.toUserMessage(),
                 firebaseToken = token,
             )
         }
@@ -349,7 +336,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 runCatching { gson.fromJson(rawResult, OutageResponse::class.java) }.getOrNull()
             }
 
+        val appTheme = prefs.getString(KEY_APP_THEME, null)
+            ?.let { savedTheme -> AppTheme.entries.firstOrNull { it.name == savedTheme } }
+            ?: AppTheme.System
+
         return MainUiState(
+            selectedTab = if (savedResult?.addressId == null) TownTab.Profile else TownTab.Notifications,
+            appTheme = appTheme,
             outageCity = prefs.getString(KEY_OUTAGE_CITY, "").orEmpty(),
             outageStreet = prefs.getString(KEY_OUTAGE_STREET, "").orEmpty(),
             outageBuilding = prefs.getString(KEY_OUTAGE_BUILDING, "").orEmpty(),
@@ -379,6 +372,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private const val KEY_OUTAGE_STREET = "outage_street"
         private const val KEY_OUTAGE_BUILDING = "outage_building"
         private const val KEY_OUTAGE_RESULT = "outage_result"
+        private const val KEY_APP_THEME = "app_theme"
+    }
+}
+
+private fun Throwable.toUserMessage(): String {
+    val isNetworkError = generateSequence(this) { it.cause }.any { it is IOException }
+    return if (isNetworkError) {
+        "Немає з'єднання з інтернетом. Перевірте мережу та спробуйте ще раз."
+    } else {
+        "Не вдалося оновити дані. Спробуйте ще раз трохи пізніше."
     }
 }
 

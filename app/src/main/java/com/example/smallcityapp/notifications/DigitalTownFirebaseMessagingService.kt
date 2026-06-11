@@ -1,10 +1,14 @@
 package com.example.smallcityapp.notifications
 
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.smallcityapp.R
 import com.example.smallcityapp.data.LocalPushMessage
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -18,7 +22,7 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title
             ?: message.data["title"]
-            ?: "Digital Town"
+            ?: getString(R.string.app_name)
         val body = message.notification?.body
             ?: message.data["body"]
             ?: message.data.entries.joinToString("\n") { "${it.key}: ${it.value}" }
@@ -46,7 +50,13 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
             .setAutoCancel(true)
             .build()
 
-        runCatching {
+        val canPostNotifications = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (canPostNotifications) {
             NotificationManagerCompat.from(this).notify(System.currentTimeMillis().toInt(), notification)
         }
     }
@@ -55,7 +65,7 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Digital Town Alerts",
+            getString(R.string.app_name),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
             description = "Міські сповіщення та важливі повідомлення"
