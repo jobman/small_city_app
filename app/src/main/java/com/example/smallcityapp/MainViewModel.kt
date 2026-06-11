@@ -223,20 +223,74 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         resolveOutageSelection()
     }
 
-    fun loadOutageCityOptions() {
+    fun loadProfileAddressOptions() {
         if (uiState.value.outageCityOptionsLoading) {
             return
         }
 
+        val savedSelection = uiState.value
         viewModelScope.launch {
             _uiState.update { it.copy(outageCityOptionsLoading = true, outageError = null) }
-            val result = repository.getOutageCities()
-            _uiState.update {
-                it.copy(
+
+            val citiesResult = repository.getOutageCities()
+            val cityLookupResult = savedSelection.outageCity
+                .takeIf { it.isNotBlank() }
+                ?.let { city ->
+                    repository.lookupOutageState(OutageLookupRequest(city = city.trim()))
+                }
+            val streetLookupResult = savedSelection.outageStreet
+                .takeIf { savedSelection.outageCity.isNotBlank() && it.isNotBlank() }
+                ?.let { street ->
+                    repository.lookupOutageState(
+                        OutageLookupRequest(
+                            city = savedSelection.outageCity.trim(),
+                            street = street.trim(),
+                        ),
+                    )
+                }
+
+            val error = citiesResult.exceptionOrNull()
+                ?: cityLookupResult?.exceptionOrNull()
+                ?: streetLookupResult?.exceptionOrNull()
+
+            var shouldResolveSavedSelection = false
+            _uiState.update { current ->
+                shouldResolveSavedSelection =
+                    current.outageResult?.addressId == null &&
+                    current.outageCity.isNotBlank() &&
+                    current.outageCity == savedSelection.outageCity &&
+                    current.outageStreet == savedSelection.outageStreet &&
+                    current.outageBuilding == savedSelection.outageBuilding
+
+                current.copy(
                     outageCityOptionsLoading = false,
-                    outageCityOptions = result.getOrNull() ?: it.outageCityOptions,
-                    outageError = result.exceptionOrNull()?.toUserMessage(),
+                    outageCityOptions = citiesResult.getOrNull() ?: current.outageCityOptions,
+                    outageStreetOptions = if (current.outageCity == savedSelection.outageCity) {
+                        cityLookupResult
+                            ?.getOrNull()
+                            ?.availableStreets
+                            ?.ifEmpty { current.outageStreetOptions }
+                            ?: current.outageStreetOptions
+                    } else {
+                        current.outageStreetOptions
+                    },
+                    outageBuildingOptions = if (
+                        current.outageCity == savedSelection.outageCity &&
+                        current.outageStreet == savedSelection.outageStreet
+                    ) {
+                        streetLookupResult
+                            ?.getOrNull()
+                            ?.availableBuildings
+                            ?.ifEmpty { current.outageBuildingOptions }
+                            ?: current.outageBuildingOptions
+                    } else {
+                        current.outageBuildingOptions
+                    },
+                    outageError = error?.toUserMessage(),
                 )
+            }
+            if (shouldResolveSavedSelection) {
+                resolveOutageSelection()
             }
         }
     }
@@ -343,9 +397,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return MainUiState(
             selectedTab = if (savedResult?.addressId == null) TownTab.Profile else TownTab.Notifications,
             appTheme = appTheme,
-            outageCity = prefs.getString(KEY_OUTAGE_CITY, "").orEmpty(),
-            outageStreet = prefs.getString(KEY_OUTAGE_STREET, "").orEmpty(),
-            outageBuilding = prefs.getString(KEY_OUTAGE_BUILDING, "").orEmpty(),
+            outageCity = prefs.getString(KEY_OUTAGE_CITY, "").orEmpty()
+                .ifBlank { savedResult?.city.orEmpty() },
+            outageStreet = prefs.getString(KEY_OUTAGE_STREET, "").orEmpty()
+                .ifBlank { savedResult?.street.orEmpty() },
+            outageBuilding = prefs.getString(KEY_OUTAGE_BUILDING, "").orEmpty()
+                .ifBlank { savedResult?.building.orEmpty() },
             outageResult = savedResult,
         )
     }

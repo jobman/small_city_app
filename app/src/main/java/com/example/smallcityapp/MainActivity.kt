@@ -139,7 +139,7 @@ class MainActivity : ComponentActivity() {
                             TownTab.News,
                             TownTab.Links -> viewModel.refreshDashboard()
                             TownTab.Outages -> viewModel.refreshOutages()
-                            TownTab.Profile -> viewModel.loadOutageCityOptions()
+                            TownTab.Profile -> viewModel.loadProfileAddressOptions()
                         }
                         if (uiState.selectedTab == TownTab.Outages || uiState.selectedTab == TownTab.Profile) {
                             break
@@ -202,7 +202,7 @@ class MainActivity : ComponentActivity() {
                             onCityChange = viewModel::updateOutageCity,
                             onStreetChange = viewModel::updateOutageStreet,
                             onBuildingChange = viewModel::updateOutageBuilding,
-                            onLoadCityOptions = viewModel::loadOutageCityOptions,
+                            onLoadCityOptions = viewModel::loadProfileAddressOptions,
                             onThemeChange = viewModel::updateAppTheme,
                         )
                     }
@@ -527,7 +527,7 @@ private fun AddressSelectionFields(
             }
         }
 
-        if (uiState.outageStreetOptions.isNotEmpty()) {
+        if (uiState.outageStreetOptions.isNotEmpty() || uiState.outageStreet.isNotBlank()) {
             ExposedDropdownMenuBox(
                 expanded = streetDropdownExpanded,
                 onExpandedChange = { streetDropdownExpanded = it },
@@ -563,7 +563,7 @@ private fun AddressSelectionFields(
             }
         }
 
-        if (uiState.outageBuildingOptions.isNotEmpty()) {
+        if (uiState.outageBuildingOptions.isNotEmpty() || uiState.outageBuilding.isNotBlank()) {
             ExposedDropdownMenuBox(
                 expanded = buildingDropdownExpanded,
                 onExpandedChange = { buildingDropdownExpanded = it },
