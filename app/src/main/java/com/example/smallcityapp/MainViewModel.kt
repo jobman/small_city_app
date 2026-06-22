@@ -23,6 +23,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
 
 enum class TownTab(val title: String) {
     Notifications("Сповіщ."),
@@ -47,10 +51,12 @@ data class MainUiState(
     val firebaseToken: String = "",
     val firebaseError: String? = null,
     val localPushes: List<LocalPushMessage> = emptyList(),
+    val newMessages: List<NewNotificationMessage> = emptyList(),
     val news: List<NewsItem> = emptyList(),
     val newsError: String? = null,
     val links: List<ExternalLinkItem> = emptyList(),
     val linksError: String? = null,
+    val serverHistoryMessages: List<NotificationMessage> = emptyList(),
     val historyMessages: List<NotificationMessage> = emptyList(),
     val historyLoading: Boolean = false,
     val historyError: String? = null,
@@ -65,6 +71,12 @@ data class MainUiState(
     val outageLoading: Boolean = false,
     val outageResult: OutageResponse? = null,
     val outageError: String? = null,
+)
+
+data class NewNotificationMessage(
+    val title: String,
+    val body: String,
+    val receivedAt: Long,
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -108,6 +120,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 outageStreet = "",
                 outageBuilding = "",
                 outageGuidance = null,
+                serverHistoryMessages = emptyList(),
+                newMessages = it.localPushes.toNewNotificationMessages(),
                 historyMessages = emptyList(),
                 historyError = null,
                 outageResult = null,
@@ -125,6 +139,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 outageBuildingOptions = emptyList(),
                 outageBuilding = "",
                 outageGuidance = null,
+                serverHistoryMessages = emptyList(),
+                newMessages = it.localPushes.toNewNotificationMessages(),
                 historyMessages = emptyList(),
                 historyError = null,
                 outageResult = null,
@@ -140,6 +156,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 outageBuilding = value,
                 outageGuidance = null,
+                serverHistoryMessages = emptyList(),
+                newMessages = it.localPushes.toNewNotificationMessages(),
                 historyMessages = emptyList(),
                 historyError = null,
                 outageResult = null,
@@ -176,6 +194,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (localPushResult.removedExpired) {
                     reloadHistoryAfterPushExpiry = state.outageResult?.addressId
                 }
+                val notificationSections = buildNotificationSections(
+                    localPushes = localPushResult.messages,
+                    serverHistoryMessages = state.serverHistoryMessages,
+                )
                 state.copy(
                     isRefreshing = false,
                     alarmActive = alarmResult.getOrNull() ?: state.alarmActive,
@@ -187,7 +209,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     firebaseToken = tokenResult.getOrNull() ?: state.firebaseToken,
                     firebaseError = tokenResult.exceptionOrNull()?.toUserMessage(),
                     localPushes = localPushResult.messages,
-                    historyMessages = state.historyMessages.withoutActivePushDuplicates(localPushResult.messages),
+                    newMessages = notificationSections.newMessages,
+                    historyMessages = notificationSections.historyMessages,
                 )
             }
             reloadHistoryAfterPushExpiry?.let { addressId ->
@@ -217,9 +240,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             if (reloadHistoryOnExpiry && localPushResult.removedExpired) {
                 reloadHistoryAfterPushExpiry = state.outageResult?.addressId
             }
+            val notificationSections = buildNotificationSections(
+                localPushes = localPushResult.messages,
+                serverHistoryMessages = state.serverHistoryMessages,
+            )
             state.copy(
                 localPushes = localPushResult.messages,
-                historyMessages = state.historyMessages.withoutActivePushDuplicates(localPushResult.messages),
+                newMessages = notificationSections.newMessages,
+                historyMessages = notificationSections.historyMessages,
             )
         }
         reloadHistoryAfterPushExpiry?.let { addressId ->
@@ -385,9 +413,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
         _uiState.update {
             val localPushes = it.localPushes
+            val serverHistoryMessages = result.getOrDefault(emptyList())
+            val notificationSections = buildNotificationSections(
+                localPushes = localPushes,
+                serverHistoryMessages = serverHistoryMessages,
+            )
             it.copy(
                 historyLoading = false,
-                historyMessages = result.getOrDefault(emptyList()).withoutActivePushDuplicates(localPushes),
+                serverHistoryMessages = serverHistoryMessages,
+                newMessages = notificationSections.newMessages,
+                historyMessages = notificationSections.historyMessages,
                 historyError = result.exceptionOrNull()?.toUserMessage(),
                 firebaseToken = token,
             )
@@ -452,23 +487,104 @@ private fun Throwable.toUserMessage(): String {
     }
 }
 
-private fun List<NotificationMessage>.withoutActivePushDuplicates(
+private data class NotificationSections(
+    val newMessages: List<NewNotificationMessage>,
+    val historyMessages: List<NotificationMessage>,
+)
+
+private fun buildNotificationSections(
     localPushes: List<LocalPushMessage>,
+    serverHistoryMessages: List<NotificationMessage>,
+): NotificationSections {
+    val now = System.currentTimeMillis()
+    val activePushBodies = localPushes
+        .map { it.body.normalizedMessageText() }
+        .filter { it.isNotBlank() }
+        .toSet()
+
+    val newMessages = buildList {
+        addAll(localPushes.toNewNotificationMessages())
+        serverHistoryMessages.forEach { message ->
+            val createdAtMillis = message.createdAt.toEpochMillis()
+            if (
+                createdAtMillis != null &&
+                createdAtMillis >= now - NEW_MESSAGE_TTL_MS &&
+                message.content.normalizedMessageText() !in activePushBodies
+            ) {
+                add(
+                    NewNotificationMessage(
+                        title = HISTORY_NEW_MESSAGE_TITLE,
+                        body = message.content,
+                        receivedAt = createdAtMillis,
+                    ),
+                )
+            }
+        }
+    }
+        .distinctBy { it.body.normalizedMessageText() }
+        .sortedByDescending { it.receivedAt }
+
+    val historyMessages = serverHistoryMessages.withoutNewMessageDuplicates(
+        localPushes = localPushes,
+        now = now,
+    )
+
+    return NotificationSections(
+        newMessages = newMessages,
+        historyMessages = historyMessages,
+    )
+}
+
+private fun List<LocalPushMessage>.toNewNotificationMessages(): List<NewNotificationMessage> {
+    return map { push ->
+        NewNotificationMessage(
+            title = push.title,
+            body = push.body,
+            receivedAt = push.receivedAt,
+        )
+    }
+}
+
+private fun List<NotificationMessage>.withoutNewMessageDuplicates(
+    localPushes: List<LocalPushMessage>,
+    now: Long,
 ): List<NotificationMessage> {
     val activePushBodies = localPushes
         .map { it.body.normalizedMessageText() }
         .filter { it.isNotBlank() }
         .toSet()
 
-    if (activePushBodies.isEmpty()) {
-        return this
+    return filterNot { message ->
+        val body = message.content.normalizedMessageText()
+        body in activePushBodies || message.isFresh(now)
+    }
+}
+
+private fun NotificationMessage.isFresh(now: Long): Boolean {
+    val createdAtMillis = createdAt.toEpochMillis() ?: return false
+    return createdAtMillis >= now - NEW_MESSAGE_TTL_MS
+}
+
+private fun String.toEpochMillis(): Long? {
+    val normalizedValue = trim()
+    if (normalizedValue.isBlank()) {
+        return null
     }
 
-    return filterNot { message ->
-        message.content.normalizedMessageText() in activePushBodies
-    }
+    return runCatching { Instant.parse(normalizedValue) }
+        .recoverCatching { OffsetDateTime.parse(normalizedValue).toInstant() }
+        .recoverCatching {
+            LocalDateTime.parse(normalizedValue)
+                .atZone(ZoneId.systemDefault())
+                .toInstant()
+        }
+        .getOrNull()
+        ?.toEpochMilli()
 }
 
 private fun String.normalizedMessageText(): String {
     return trim().replace(Regex("\\s+"), " ")
 }
+
+private const val HISTORY_NEW_MESSAGE_TITLE = "Тростянецька громада"
+private const val NEW_MESSAGE_TTL_MS = 12 * 60 * 60 * 1_000L

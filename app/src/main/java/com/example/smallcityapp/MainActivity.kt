@@ -329,13 +329,13 @@ private fun NotificationsScreen(
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        if (uiState.localPushes.isEmpty()) {
+        if (uiState.newMessages.isEmpty()) {
             item {
                 EmptyCard("Коли з'являться нові сповіщення, вони будуть тут.")
             }
         } else {
-            items(uiState.localPushes) { push ->
-                PushMessageCard(push)
+            items(uiState.newMessages) { message ->
+                NewMessageCard(message)
             }
         }
         item {
@@ -829,7 +829,7 @@ private fun EmptyCard(text: String) {
 }
 
 @Composable
-private fun PushMessageCard(message: LocalPushMessage) {
+private fun NewMessageCard(message: NewNotificationMessage) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
