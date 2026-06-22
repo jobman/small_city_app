@@ -47,7 +47,7 @@ data class OutageResponse(
     val street: String? = null,
     val building: String? = null,
     val queue: String? = null,
-    @SerializedName("updated_at")
+    @SerializedName(value = "updated_at", alternate = ["last_updated"])
     val updatedAt: String? = null,
     val periods: List<OutagePeriod?>? = emptyList(),
 )

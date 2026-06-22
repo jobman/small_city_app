@@ -1,6 +1,7 @@
 package com.example.smallcityapp
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -73,11 +74,14 @@ import com.example.smallcityapp.data.NewsItem
 import com.example.smallcityapp.data.NotificationMessage
 import com.example.smallcityapp.data.OutagePeriod
 import com.example.smallcityapp.data.OutageResponse
+import com.example.smallcityapp.notifications.LocalPushStore
+import com.example.smallcityapp.notifications.PushMessagePayload
 import com.example.smallcityapp.ui.theme.SmallCityAPPTheme
 import com.example.smallcityapp.ui.theme.SportGreen
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -88,6 +92,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        savePushFromIntent(intent)
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val systemDarkTheme = isSystemInDarkTheme()
@@ -209,6 +214,35 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        savePushFromIntent(intent)
+    }
+
+    private fun savePushFromIntent(intent: Intent?): Boolean {
+        if (intent == null) {
+            return false
+        }
+        if (intent.getBooleanExtra(PushMessagePayload.EXTRA_HANDLED, false)) {
+            return false
+        }
+
+        val body = PushMessagePayload.bodyFromIntent(intent) ?: return false
+        val title = PushMessagePayload.titleFromIntent(intent) ?: getString(R.string.app_name)
+        LocalPushStore(applicationContext).saveMessage(
+            LocalPushMessage(
+                title = title,
+                body = body,
+                receivedAt = PushMessagePayload.receivedAtFromIntent(intent) ?: System.currentTimeMillis(),
+            ),
+        )
+        viewModel.selectTab(TownTab.Notifications)
+        viewModel.refreshReceivedPushes()
+        intent.putExtra(PushMessagePayload.EXTRA_HANDLED, true)
+        return true
     }
 }
 
@@ -932,6 +966,10 @@ private fun formatIsoDateTime(value: String?): String {
         return "невідомо"
     }
     val normalizedValue = value.trim()
+    runCatching { LocalTime.parse(normalizedValue) }
+        .getOrNull()
+        ?.let { time -> return TIME_FORMATTER.format(time) }
+
     return runCatching {
         val instant = runCatching { Instant.parse(normalizedValue) }
             .recoverCatching { OffsetDateTime.parse(normalizedValue).toInstant() }
@@ -981,6 +1019,9 @@ private fun String?.formatOutageTime(): String? {
 
 private val DATE_TIME_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
+
+private val TIME_FORMATTER: DateTimeFormatter =
+    DateTimeFormatter.ofPattern("HH:mm")
 
 private fun AppTheme.title(): String = when (this) {
     AppTheme.System -> "Як у телефоні"

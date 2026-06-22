@@ -1,6 +1,7 @@
 package com.example.smallcityapp.notifications
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.example.smallcityapp.data.LocalPushMessage
 import org.json.JSONArray
 import org.json.JSONObject
@@ -41,7 +42,11 @@ class LocalPushStore(context: Context) {
     fun saveMessage(message: LocalPushMessage) {
         val updated = buildList {
             add(message)
-            addAll(getMessages())
+            addAll(
+                getMessages().filterNot { savedMessage ->
+                    savedMessage.title == message.title && savedMessage.body == message.body
+                },
+            )
         }.take(MAX_MESSAGES)
 
         saveMessages(updated)
@@ -71,6 +76,22 @@ class LocalPushStore(context: Context) {
     }
 
     fun getSavedToken(): String? = preferences.getString(KEY_TOKEN, null)
+
+    fun registerMessagesChangeListener(
+        onMessagesChanged: () -> Unit,
+    ): SharedPreferences.OnSharedPreferenceChangeListener {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_MESSAGES) {
+                onMessagesChanged()
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        return listener
+    }
+
+    fun unregisterMessagesChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        preferences.unregisterOnSharedPreferenceChangeListener(listener)
+    }
 
     companion object {
         private const val KEY_MESSAGES = "messages"

@@ -2,6 +2,7 @@ package com.example.smallcityapp
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smallcityapp.data.DigitalTownRepository
@@ -75,9 +76,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(loadSavedState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+    private val pushMessagesListener: SharedPreferences.OnSharedPreferenceChangeListener
 
     init {
+        pushMessagesListener = pushStore.registerMessagesChangeListener {
+            refreshReceivedPushes(reloadHistoryOnExpiry = true)
+        }
         refreshDashboard()
+    }
+
+    override fun onCleared() {
+        pushStore.unregisterMessagesChangeListener(pushMessagesListener)
+        super.onCleared()
     }
 
     fun selectTab(tab: TownTab) {
