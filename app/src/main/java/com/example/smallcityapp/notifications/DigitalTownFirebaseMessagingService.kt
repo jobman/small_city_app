@@ -23,9 +23,8 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
-        val title = message.notification?.title
+        val title = PushMessagePayload.titleFromNotification(message.notification?.title)
             ?: PushMessagePayload.titleFromData(message.data)
-            ?: getString(R.string.app_name)
         val body = message.notification?.body
             ?: PushMessagePayload.bodyFromData(message.data)
             ?: message.data.entries.joinToString("\n") { "${it.key}: ${it.value}" }
@@ -42,12 +41,12 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
         showNotification(title = title, body = body, receivedAt = receivedAt)
     }
 
-    private fun showNotification(title: String, body: String, receivedAt: Long) {
+    private fun showNotification(title: String?, body: String, receivedAt: Long) {
         ensureChannel()
 
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(PushMessagePayload.EXTRA_TITLE, title)
+            title?.let { putExtra(PushMessagePayload.EXTRA_TITLE, it) }
             putExtra(PushMessagePayload.EXTRA_BODY, body)
             putExtra(PushMessagePayload.EXTRA_RECEIVED_AT, receivedAt)
         }
@@ -58,14 +57,17 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+
+        title?.let { notificationBuilder.setContentTitle(it) }
+
+        val notification = notificationBuilder
             .build()
 
         val canPostNotifications = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||

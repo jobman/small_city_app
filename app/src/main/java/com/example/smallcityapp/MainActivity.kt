@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val body = PushMessagePayload.bodyFromIntent(intent) ?: return false
-        val title = PushMessagePayload.titleFromIntent(intent) ?: getString(R.string.app_name)
+        val title = PushMessagePayload.titleFromIntent(intent)
         LocalPushStore(applicationContext).saveMessage(
             LocalPushMessage(
                 title = title,
@@ -835,7 +835,9 @@ private fun NewMessageCard(message: NewNotificationMessage) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(message.title, fontWeight = FontWeight.SemiBold)
+            message.title?.let { title ->
+                Text(title, fontWeight = FontWeight.SemiBold)
+            }
             Text(message.body)
             Text(
                 text = DateUtils.getRelativeTimeSpanString(message.receivedAt).toString(),

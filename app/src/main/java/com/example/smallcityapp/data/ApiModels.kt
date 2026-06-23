@@ -29,6 +29,7 @@ data class NotificationHistoryResponse(
 
 data class NotificationMessage(
     val id: Long,
+    val title: String? = null,
     val content: String,
     @SerializedName("created_at")
     val createdAt: String,
@@ -74,7 +75,7 @@ data class OutageLookupState(
 )
 
 data class LocalPushMessage(
-    val title: String,
+    val title: String? = null,
     val body: String,
     val receivedAt: Long,
 )

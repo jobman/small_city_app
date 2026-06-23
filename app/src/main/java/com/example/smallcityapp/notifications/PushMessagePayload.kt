@@ -14,7 +14,6 @@ object PushMessagePayload {
         "notification_title",
         "gcm.n.title",
         "gcm.notification.title",
-        "google.c.a.c_l",
     )
     private val BODY_KEYS = listOf(
         "body",
@@ -26,17 +25,19 @@ object PushMessagePayload {
         "gcm.notification.body",
     )
 
+    fun titleFromNotification(title: String?): String? = title.visibleValueOrNull()
+
     fun titleFromData(data: Map<String, String>): String? = data.firstValue(TITLE_KEYS)
 
     fun bodyFromData(data: Map<String, String>): String? = data.firstValue(BODY_KEYS)
 
     fun titleFromIntent(intent: Intent): String? {
-        return intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
+        return intent.getStringExtra(EXTRA_TITLE).visibleValueOrNull()
             ?: intent.extras?.firstValue(TITLE_KEYS)
     }
 
     fun bodyFromIntent(intent: Intent): String? {
-        return intent.getStringExtra(EXTRA_BODY)?.takeIf { it.isNotBlank() }
+        return intent.getStringExtra(EXTRA_BODY).visibleValueOrNull()
             ?: intent.extras?.firstValue(BODY_KEYS)
     }
 
@@ -46,13 +47,22 @@ object PushMessagePayload {
 
     private fun Map<String, String>.firstValue(keys: List<String>): String? {
         return keys.firstNotNullOfOrNull { key ->
-            get(key)?.takeIf { it.isNotBlank() }
+            get(key).visibleValueOrNull()
         }
     }
 
     private fun Bundle.firstValue(keys: List<String>): String? {
         return keys.firstNotNullOfOrNull { key ->
-            get(key)?.toString()?.takeIf { it.isNotBlank() }
+            get(key)?.toString().visibleValueOrNull()
         }
     }
+
+    private fun String?.visibleValueOrNull(): String? {
+        return this
+            ?.replace(INVISIBLE_CHARACTERS, "")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    private val INVISIBLE_CHARACTERS = Regex("[\\u200B\\u200C\\u200D\\uFEFF]")
 }

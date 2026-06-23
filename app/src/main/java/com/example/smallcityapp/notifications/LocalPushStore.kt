@@ -2,12 +2,14 @@ package com.example.smallcityapp.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.smallcityapp.R
 import com.example.smallcityapp.data.LocalPushMessage
 import org.json.JSONArray
 import org.json.JSONObject
 
 class LocalPushStore(context: Context) {
     private val preferences = context.getSharedPreferences("digital_town_pushes", Context.MODE_PRIVATE)
+    private val appName = context.getString(R.string.app_name)
 
     fun getMessages(): List<LocalPushMessage> = getMessagesResult().messages
 
@@ -18,8 +20,10 @@ class LocalPushStore(context: Context) {
             val array = JSONArray(raw)
             List(array.length()) { index ->
                 val item = array.getJSONObject(index)
+                val titleProvidedByServer = item.optBoolean("titleProvided", false)
                 LocalPushMessage(
-                    title = item.optString("title"),
+                    title = PushMessagePayload.titleFromNotification(item.optString("title"))
+                        ?.takeUnless { it == appName && !titleProvidedByServer },
                     body = item.optString("body"),
                     receivedAt = item.optLong("receivedAt"),
                 )
@@ -55,11 +59,18 @@ class LocalPushStore(context: Context) {
     private fun saveMessages(messages: List<LocalPushMessage>) {
         val serialized = JSONArray().apply {
             messages.forEach { item ->
+                val payload = JSONObject()
+                    .put("body", item.body)
+                    .put("receivedAt", item.receivedAt)
+
+                item.title?.let {
+                    payload
+                        .put("title", it)
+                        .put("titleProvided", true)
+                }
+
                 put(
-                    JSONObject()
-                        .put("title", item.title)
-                        .put("body", item.body)
-                        .put("receivedAt", item.receivedAt),
+                    payload,
                 )
             }
         }

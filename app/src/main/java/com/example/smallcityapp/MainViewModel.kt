@@ -74,7 +74,7 @@ data class MainUiState(
 )
 
 data class NewNotificationMessage(
-    val title: String,
+    val title: String?,
     val body: String,
     val receivedAt: Long,
 )
@@ -513,7 +513,7 @@ private fun buildNotificationSections(
             ) {
                 add(
                     NewNotificationMessage(
-                        title = HISTORY_NEW_MESSAGE_TITLE,
+                        title = message.title.visibleTitleOrNull(),
                         body = message.content,
                         receivedAt = createdAtMillis,
                     ),
@@ -538,7 +538,7 @@ private fun buildNotificationSections(
 private fun List<LocalPushMessage>.toNewNotificationMessages(): List<NewNotificationMessage> {
     return map { push ->
         NewNotificationMessage(
-            title = push.title,
+            title = push.title.visibleTitleOrNull(),
             body = push.body,
             receivedAt = push.receivedAt,
         )
@@ -586,5 +586,12 @@ private fun String.normalizedMessageText(): String {
     return trim().replace(Regex("\\s+"), " ")
 }
 
-private const val HISTORY_NEW_MESSAGE_TITLE = "Тростянецька громада"
+private fun String?.visibleTitleOrNull(): String? {
+    return this
+        ?.replace(INVISIBLE_TITLE_CHARACTERS, "")
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+}
+
+private val INVISIBLE_TITLE_CHARACTERS = Regex("[\\u200B\\u200C\\u200D\\uFEFF]")
 private const val NEW_MESSAGE_TTL_MS = 12 * 60 * 60 * 1_000L
