@@ -418,8 +418,8 @@ private fun OutagesScreen(
             uiState.outageResult.let { result ->
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        result.queue?.let {
-                            AssistChip(onClick = {}, label = { Text("Черга: $it") })
+                        result.queue?.formatQueueLabel()?.let { queue ->
+                            AssistChip(onClick = {}, label = { Text("Черга: $queue") })
                         }
                         result.updatedAt?.let {
                             AssistChip(onClick = {}, label = { Text("Оновлено: ${formatIsoDateTime(it)}") })
@@ -1034,7 +1034,7 @@ private fun AppTheme.title(): String = when (this) {
 private enum class OutagePeriodStatus(val title: String) {
     PowerOn("Світло є"),
     PowerOff("Світла немає"),
-    ScheduledOutage("Планове відключення"),
+    ScheduledOutage("Відключення"),
     Unknown("Статус графіка"),
 }
 
@@ -1047,6 +1047,13 @@ private fun String.breakLongWords(maxChunkLength: Int = 16): String {
                 word.chunked(maxChunkLength).joinToString(ZERO_WIDTH_SPACE)
             }
         }
+}
+
+private fun String.formatQueueLabel(): String? {
+    return trim()
+        .replace(Regex("^черга\\s*:?\\s*", RegexOption.IGNORE_CASE), "")
+        .trim()
+        .takeIf { it.isNotEmpty() }
 }
 
 private val OUTAGE_STATUS_VALUES = setOf("ON", "OFF")
