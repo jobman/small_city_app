@@ -129,6 +129,7 @@ class DigitalTownRepository(
                 street = street?.takeIf { it.isNotBlank() } ?: request.street,
                 building = building?.takeIf { it.isNotBlank() } ?: request.building,
                 periods = periods.orEmpty().filterNotNull(),
+                message = message?.toFriendlyOutageMessage(),
             )
 
         private fun String.toFriendlyOutageMessage(): String {

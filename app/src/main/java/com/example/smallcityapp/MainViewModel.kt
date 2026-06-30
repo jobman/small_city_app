@@ -343,10 +343,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { current ->
                 result.fold(
                     onSuccess = { lookup ->
+                        val response = lookup.response
                         val nextState = current.copy(
                             outageLoading = false,
-                            outageResult = lookup.response,
-                            outageGuidance = lookup.message,
+                            outageResult = response,
+                            outageGuidance = lookup.message
+                                ?: response?.message
+                                ?: if (response?.scheduleSupported == false) {
+                                    OUTAGE_SCHEDULE_UNAVAILABLE_MESSAGE
+                                } else {
+                                    null
+                                },
                             outageStreetOptions = lookup.availableStreets.ifEmpty {
                                 current.outageStreetOptions
                             },
@@ -596,4 +603,5 @@ private fun String?.visibleTitleOrNull(): String? {
 }
 
 private val INVISIBLE_TITLE_CHARACTERS = Regex("[\\u200B\\u200C\\u200D\\uFEFF]")
+private const val OUTAGE_SCHEDULE_UNAVAILABLE_MESSAGE = "Для обраної адреси відсутній графік відключень"
 private const val NEW_MESSAGE_TTL_MS = 12 * 60 * 60 * 1_000L

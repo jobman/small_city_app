@@ -51,6 +51,9 @@ data class OutageResponse(
     @SerializedName(value = "updated_at", alternate = ["last_updated"])
     val updatedAt: String? = null,
     val periods: List<OutagePeriod?>? = emptyList(),
+    @SerializedName("schedule_supported")
+    val scheduleSupported: Boolean? = null,
+    val message: String? = null,
 )
 
 data class OutagePeriod(

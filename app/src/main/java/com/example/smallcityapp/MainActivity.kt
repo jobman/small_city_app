@@ -429,7 +429,11 @@ private fun OutagesScreen(
                 val outagePeriods = result.periods.orEmpty().filterNotNull()
                 if (!uiState.outageLoading && outagePeriods.isEmpty()) {
                     item {
-                        EmptyCard("Для обраної адреси відсутній графік відключень.")
+                        EmptyCard(
+                            result.message
+                                ?: uiState.outageGuidance
+                                ?: "Для обраної адреси відсутній графік відключень",
+                        )
                     }
                 } else {
                     items(outagePeriods) { period ->
