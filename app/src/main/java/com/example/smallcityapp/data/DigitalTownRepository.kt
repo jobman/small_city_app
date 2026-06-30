@@ -38,7 +38,7 @@ class DigitalTownRepository(
             val state = lookupOutageState(request).getOrThrow()
             state.response ?: throw IllegalStateException(
                 buildString {
-                    append(state.message ?: "Не вдалося отримати графік відключень")
+                    append(state.message?.toFriendlyOutageMessage() ?: "Не вдалося отримати графік відключень")
                     val options = buildList {
                         addAll(state.availableCities)
                         addAll(state.availableStreets)
@@ -71,7 +71,7 @@ class DigitalTownRepository(
             } else {
                 val payload = parseOutageError(response.errorBody()?.string())
                 OutageLookupState(
-                    message = payload.message,
+                    message = payload.message.toFriendlyOutageMessage(),
                     availableCities = payload.availableCities,
                     availableStreets = payload.availableStreets,
                     availableBuildings = payload.availableBuildings,
@@ -130,5 +130,17 @@ class DigitalTownRepository(
                 building = building?.takeIf { it.isNotBlank() } ?: request.building,
                 periods = periods.orEmpty().filterNotNull(),
             )
+
+        private fun String.toFriendlyOutageMessage(): String {
+            val normalized = trim().lowercase()
+            return if (
+                normalized == "schedule not found for the selected address" ||
+                normalized.contains("не підтримує графіка відключень")
+            ) {
+                "Для обраної адреси відсутній графік відключень"
+            } else {
+                this
+            }
+        }
     }
 }

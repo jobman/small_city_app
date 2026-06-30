@@ -141,8 +141,8 @@ class MainActivity : ComponentActivity() {
                     while (true) {
                         when (uiState.selectedTab) {
                             TownTab.Notifications -> viewModel.refreshNotifications()
-                            TownTab.News,
-                            TownTab.Links -> viewModel.refreshDashboard()
+                            TownTab.News -> viewModel.refreshNews()
+                            TownTab.Links -> viewModel.refreshLinks()
                             TownTab.Outages -> viewModel.refreshOutages()
                             TownTab.Profile -> viewModel.loadProfileAddressOptions()
                         }
@@ -402,7 +402,7 @@ private fun OutagesScreen(
         }
         if (uiState.outageResult?.addressId == null) {
             item {
-                EmptyCard("Для перегляду графіка оберіть адресу в Профілі.")
+                EmptyCard(uiState.outageGuidance ?: "Для перегляду графіка оберіть адресу в Профілі.")
             }
         } else {
             if (uiState.outageLoading) {
@@ -429,7 +429,7 @@ private fun OutagesScreen(
                 val outagePeriods = result.periods.orEmpty().filterNotNull()
                 if (!uiState.outageLoading && outagePeriods.isEmpty()) {
                     item {
-                        EmptyCard("Для обраної адреси зараз немає доступного графіка відключень.")
+                        EmptyCard("Для обраної адреси відсутній графік відключень.")
                     }
                 } else {
                     items(outagePeriods) { period ->

@@ -3,6 +3,8 @@ package com.example.smallcityapp
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.smallcityapp.data.DigitalTownRepository
@@ -15,8 +17,6 @@ import com.example.smallcityapp.data.OutageResponse
 import com.example.smallcityapp.notifications.FirebaseTokenProvider
 import com.example.smallcityapp.notifications.LocalPushStore
 import com.google.gson.Gson
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -80,6 +80,7 @@ data class NewNotificationMessage(
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+    private val appContext = application.applicationContext
     private val repository = DigitalTownRepository()
     private val pushStore = LocalPushStore(application)
     private val tokenProvider = FirebaseTokenProvider(application)
@@ -94,7 +95,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         pushMessagesListener = pushStore.registerMessagesChangeListener {
             refreshReceivedPushes(reloadHistoryOnExpiry = true)
         }
-        refreshDashboard()
+        refreshReceivedPushes(reloadHistoryOnExpiry = false)
     }
 
     override fun onCleared() {
@@ -168,53 +169,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         resolveOutageSelection()
     }
 
-    fun refreshDashboard() {
+    fun refreshAlarm() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true, alarmError = null, newsError = null, linksError = null) }
-
-            val alarmDeferred = async { repository.getAlarmState() }
-            val newsDeferred = async { repository.getNews() }
-            val linksDeferred = async { repository.getLinks() }
-            val tokenDeferred = async { tokenProvider.getToken() }
-
-            val results = awaitAll(alarmDeferred, newsDeferred, linksDeferred, tokenDeferred)
-
-            @Suppress("UNCHECKED_CAST")
-            val alarmResult = results[0] as Result<Boolean>
-            @Suppress("UNCHECKED_CAST")
-            val newsResult = results[1] as Result<List<NewsItem>>
-            @Suppress("UNCHECKED_CAST")
-            val linksResult = results[2] as Result<List<ExternalLinkItem>>
-            @Suppress("UNCHECKED_CAST")
-            val tokenResult = results[3] as Result<String>
-
-            var reloadHistoryAfterPushExpiry: Int? = null
+            val result = repository.getAlarmState()
             _uiState.update { state ->
-                val localPushResult = pushStore.getMessagesResult()
-                if (localPushResult.removedExpired) {
-                    reloadHistoryAfterPushExpiry = state.outageResult?.addressId
-                }
-                val notificationSections = buildNotificationSections(
-                    localPushes = localPushResult.messages,
-                    serverHistoryMessages = state.serverHistoryMessages,
-                )
                 state.copy(
-                    isRefreshing = false,
-                    alarmActive = alarmResult.getOrNull() ?: state.alarmActive,
-                    alarmError = alarmResult.exceptionOrNull()?.toUserMessage(),
-                    news = newsResult.getOrNull() ?: state.news,
-                    newsError = newsResult.exceptionOrNull()?.toUserMessage(),
-                    links = linksResult.getOrNull() ?: state.links,
-                    linksError = linksResult.exceptionOrNull()?.toUserMessage(),
-                    firebaseToken = tokenResult.getOrNull() ?: state.firebaseToken,
-                    firebaseError = tokenResult.exceptionOrNull()?.toUserMessage(),
-                    localPushes = localPushResult.messages,
-                    newMessages = notificationSections.newMessages,
-                    historyMessages = notificationSections.historyMessages,
+                    alarmActive = result.getOrNull() ?: state.alarmActive,
+                    alarmError = result.exceptionOrNull()?.toUserMessage(appContext),
                 )
             }
-            reloadHistoryAfterPushExpiry?.let { addressId ->
-                loadHistoryForAddress(addressId = addressId, showLoading = false)
+        }
+    }
+
+    fun refreshNews() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, newsError = null) }
+            val result = repository.getNews()
+            _uiState.update { state ->
+                state.copy(
+                    isRefreshing = false,
+                    news = result.getOrNull() ?: state.news,
+                    newsError = result.exceptionOrNull()?.toUserMessage(appContext),
+                )
+            }
+        }
+    }
+
+    fun refreshLinks() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshing = true, linksError = null) }
+            val result = repository.getLinks()
+            _uiState.update { state ->
+                state.copy(
+                    isRefreshing = false,
+                    links = result.getOrNull() ?: state.links,
+                    linksError = result.exceptionOrNull()?.toUserMessage(appContext),
+                )
             }
         }
     }
@@ -225,7 +215,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshNotifications() {
         refreshReceivedPushes(reloadHistoryOnExpiry = false)
-        refreshDashboard()
+        refreshAlarm()
         uiState.value.outageResult?.addressId?.let { addressId ->
             viewModelScope.launch {
                 loadHistoryForAddress(addressId = addressId, showLoading = true)
@@ -324,7 +314,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     } else {
                         current.outageBuildingOptions
                     },
-                    outageError = error?.toUserMessage(),
+                    outageError = error?.toUserMessage(appContext),
                 )
             }
             if (shouldResolveSavedSelection) {
@@ -372,7 +362,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     onFailure = { error ->
                         current.copy(
                             outageLoading = false,
-                            outageError = error.toUserMessage(),
+                            outageError = error.toUserMessage(appContext),
                         )
                     },
                 )
@@ -399,7 +389,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update {
                 it.copy(
                     historyLoading = false,
-                    historyError = tokenResult.exceptionOrNull()?.toUserMessage()
+                    historyError = tokenResult.exceptionOrNull()?.toUserMessage(appContext)
                         ?: "Не вдалося отримати Firebase token",
                 )
             }
@@ -423,7 +413,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 serverHistoryMessages = serverHistoryMessages,
                 newMessages = notificationSections.newMessages,
                 historyMessages = notificationSections.historyMessages,
-                historyError = result.exceptionOrNull()?.toUserMessage(),
+                historyError = result.exceptionOrNull()?.toUserMessage(appContext),
                 firebaseToken = token,
             )
         }
@@ -478,13 +468,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
-private fun Throwable.toUserMessage(): String {
+private fun Throwable.toUserMessage(context: Context): String {
     val isNetworkError = generateSequence(this) { it.cause }.any { it is IOException }
     return if (isNetworkError) {
-        "Немає з'єднання з інтернетом. Перевірте мережу та спробуйте ще раз."
+        if (context.hasValidatedInternetConnection()) {
+            "Немає зв'язку з сервером. Спробуйте ще раз трохи пізніше."
+        } else {
+            "Немає з'єднання з інтернетом. Перевірте мережу та спробуйте ще раз."
+        }
     } else {
         "Не вдалося оновити дані. Спробуйте ще раз трохи пізніше."
     }
+}
+
+private fun Context.hasValidatedInternetConnection(): Boolean {
+    val connectivityManager = getSystemService(ConnectivityManager::class.java) ?: return false
+    val network = connectivityManager.activeNetwork ?: return false
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
 }
 
 private data class NotificationSections(
