@@ -38,7 +38,7 @@ class DigitalTownRepository(
             val state = lookupOutageState(request).getOrThrow()
             state.response ?: throw IllegalStateException(
                 buildString {
-                    append(state.message?.toFriendlyOutageMessage() ?: "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ")
+                    append(state.message?.toFriendlyOutageMessage() ?: "Не вдалося отримати графік відключень")
                     val options = buildList {
                         addAll(state.availableCities)
                         addAll(state.availableStreets)
@@ -66,7 +66,7 @@ class DigitalTownRepository(
                 OutageLookupState(
                     response = response.body()
                         ?.withFallbackAddress(request)
-                        ?: error("РџРѕСЂРѕР¶РЅСЏ РІС–РґРїРѕРІС–РґСЊ СЃРµСЂРІРµСЂР°"),
+                        ?: error("Порожня відповідь сервера"),
                 )
             } else {
                 val payload = parseOutageError(response.errorBody()?.string())
@@ -82,13 +82,13 @@ class DigitalTownRepository(
 
     private fun parseOutageError(rawBody: String?): OutageErrorPayload {
         if (rawBody.isNullOrBlank()) {
-            return OutageErrorPayload(message = "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ")
+            return OutageErrorPayload(message = "Не вдалося отримати графік відключень")
         }
 
         return runCatching {
             val json = JSONObject(rawBody)
             OutageErrorPayload(
-                message = json.optString("error", "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ"),
+                message = json.optString("error", "Не вдалося отримати графік відключень"),
                 availableCities = json.optJSONArrayStrings("available_cities"),
                 availableStreets = json.optJSONArrayStrings("available_streets"),
                 availableBuildings = json.optJSONArrayStrings("available_buildings"),
@@ -136,9 +136,9 @@ class DigitalTownRepository(
             val normalized = trim().lowercase()
             return if (
                 normalized == "schedule not found for the selected address" ||
-                normalized.contains("РЅРµ РїС–РґС‚СЂРёРјСѓС” РіСЂР°С„С–РєР° РІС–РґРєР»СЋС‡РµРЅСЊ")
+                normalized.contains("не підтримує графіка відключень")
             ) {
-                "Р”Р»СЏ РѕР±СЂР°РЅРѕС— Р°РґСЂРµСЃРё РІС–РґСЃСѓС‚РЅС–Р№ РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ"
+                "Для обраної адреси відсутній графік відключень"
             } else {
                 this
             }

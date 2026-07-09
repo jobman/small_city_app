@@ -315,7 +315,7 @@ private fun NotificationsScreen(
     ) {
         item {
             Text(
-                text = "РЎРїРѕРІС–С‰РµРЅРЅСЏ",
+                text = "Сповіщення",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
@@ -324,14 +324,14 @@ private fun NotificationsScreen(
         }
         item {
             Text(
-                text = "РќРѕРІС– РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ",
+                text = "Нові повідомлення",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
         }
         if (uiState.newMessages.isEmpty()) {
             item {
-                EmptyCard("РљРѕР»Рё Р·'СЏРІР»СЏС‚СЊСЃСЏ РЅРѕРІС– СЃРїРѕРІС–С‰РµРЅРЅСЏ, РІРѕРЅРё Р±СѓРґСѓС‚СЊ С‚СѓС‚.")
+                EmptyCard("Коли з'являться нові сповіщення, вони будуть тут.")
             }
         } else {
             items(uiState.newMessages) { message ->
@@ -340,19 +340,19 @@ private fun NotificationsScreen(
         }
         item {
             Text(
-                text = "Р†СЃС‚РѕСЂС–СЏ РїРѕРІС–РґРѕРјР»РµРЅСЊ Р·Р° РѕСЃС‚Р°РЅРЅС–Р№ РјС–СЃСЏС†СЊ",
+                text = "Історія повідомлень за останній місяць",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
         }
         if (uiState.outageResult?.addressId == null) {
             item {
-                EmptyCard("Р”Р»СЏ РїРµСЂРµРіР»СЏРґСѓ РїРѕРІС–РґРѕРјР»РµРЅСЊ РѕР±РµСЂС–С‚СЊ Р°РґСЂРµСЃСѓ РІ РџСЂРѕС„С–Р»С–.")
+                EmptyCard("Для перегляду повідомлень оберіть адресу в Профілі.")
             }
         } else {
             item {
                 StatusCard(
-                    title = "РћР±СЂР°РЅР° Р°РґСЂРµСЃР°",
+                    title = "Обрана адреса",
                     body = listOfNotNull(
                         uiState.outageResult.city,
                         uiState.outageResult.street,
@@ -365,14 +365,14 @@ private fun NotificationsScreen(
             if (uiState.historyLoading) {
                 item {
                     StatusCard(
-                        title = "РћРЅРѕРІР»РµРЅРЅСЏ",
-                        body = "Р—Р°РІР°РЅС‚Р°Р¶СѓС”РјРѕ РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ РґР»СЏ РѕР±СЂР°РЅРѕС— Р°РґСЂРµСЃРё.",
+                        title = "Оновлення",
+                        body = "Завантажуємо повідомлення для обраної адреси.",
                     )
                 }
             }
             if (!uiState.historyLoading && uiState.historyMessages.isEmpty()) {
                 item {
-                    EmptyCard("РџРѕРІС–РґРѕРјР»РµРЅСЊ РґР»СЏ С†С–С”С— Р°РґСЂРµСЃРё РїРѕРєРё РЅРµРјР°С”. РљРѕР»Рё Р·'СЏРІР»СЏС‚СЊСЃСЏ РЅРѕРІС– РѕРЅРѕРІР»РµРЅРЅСЏ, РІРѕРЅРё Р±СѓРґСѓС‚СЊ С‚СѓС‚.")
+                    EmptyCard("Повідомлень для цієї адреси поки немає. Коли з'являться нові оновлення, вони будуть тут.")
                 }
             } else {
                 items(uiState.historyMessages) { message ->
@@ -396,13 +396,13 @@ private fun OutagesScreen(
     ) {
         item {
             Text(
-                text = "Р“СЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ СЃРІС–С‚Р»Р°",
+                text = "Графік відключень світла",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (uiState.outageResult?.addressId == null) {
             item {
-                EmptyCard(uiState.outageGuidance ?: "Р”Р»СЏ РїРµСЂРµРіР»СЏРґСѓ РіСЂР°С„С–РєР° РѕР±РµСЂС–С‚СЊ Р°РґСЂРµСЃСѓ РІ РџСЂРѕС„С–Р»С–.")
+                EmptyCard(uiState.outageGuidance ?: "Для перегляду графіка оберіть адресу в Профілі.")
             }
         } else {
             if (uiState.outageLoading) {
@@ -419,10 +419,10 @@ private fun OutagesScreen(
                 item {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         result.queue?.formatQueueLabel()?.let { queue ->
-                            AssistChip(onClick = {}, label = { Text("Р§РµСЂРіР°: $queue") })
+                            AssistChip(onClick = {}, label = { Text("Черга: $queue") })
                         }
                         result.updatedAt?.let {
-                            AssistChip(onClick = {}, label = { Text("РћРЅРѕРІР»РµРЅРѕ: ${formatIsoDateTime(it)}") })
+                            AssistChip(onClick = {}, label = { Text("Оновлено: ${formatIsoDateTime(it)}") })
                         }
                     }
                 }
@@ -432,7 +432,7 @@ private fun OutagesScreen(
                         EmptyCard(
                             result.message
                                 ?: uiState.outageGuidance
-                                ?: "Р”Р»СЏ РѕР±СЂР°РЅРѕС— Р°РґСЂРµСЃРё РІС–РґСЃСѓС‚РЅС–Р№ РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ",
+                                ?: "Для обраної адреси відсутній графік відключень",
                         )
                     }
                 } else {
@@ -463,12 +463,12 @@ private fun ProfileScreen(
     ) {
         item {
             Text(
-                text = "РџСЂРѕС„С–Р»СЊ",
+                text = "Профіль",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
         item {
-            Text("РћР±РµСЂС–С‚СЊ Р°РґСЂРµСЃСѓ РґР»СЏ РѕС‚СЂРёРјСѓРІР°РЅРЅСЏ РїРµСЂСЃРѕРЅР°Р»С–Р·РѕРІР°РЅРёС… СЃРїРѕРІС–С‰РµРЅСЊ")
+            Text("Оберіть адресу для отримування персоналізованих сповіщень")
         }
         item {
             AddressSelectionFields(
@@ -486,7 +486,7 @@ private fun ProfileScreen(
         }
         item {
             Text(
-                text = "РљРѕР»СЊРѕСЂРѕРІР° С‚РµРјР°",
+                text = "Кольорова тема",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -537,8 +537,8 @@ private fun AddressSelectionFields(
                 modifier = Modifier
                     .fillMaxWidth()
                     .menuAnchor(),
-                label = { Text("РќР°СЃРµР»РµРЅРёР№ РїСѓРЅРєС‚") },
-                placeholder = { Text("РћР±РµСЂС–С‚СЊ РЅР°СЃРµР»РµРЅРёР№ РїСѓРЅРєС‚") },
+                label = { Text("Населений пункт") },
+                placeholder = { Text("Оберіть населений пункт") },
                 readOnly = true,
                 singleLine = true,
                 trailingIcon = {
@@ -576,8 +576,8 @@ private fun AddressSelectionFields(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    label = { Text("РђРґСЂРµСЃР°") },
-                    placeholder = { Text("РћР±РµСЂС–С‚СЊ РІСѓР»РёС†СЋ") },
+                    label = { Text("Адреса") },
+                    placeholder = { Text("Оберіть вулицю") },
                     readOnly = true,
                     singleLine = true,
                     trailingIcon = {
@@ -612,8 +612,8 @@ private fun AddressSelectionFields(
                     modifier = Modifier
                         .fillMaxWidth()
                         .menuAnchor(),
-                    label = { Text("Р‘СѓРґРёРЅРѕРє") },
-                    placeholder = { Text("РћР±РµСЂС–С‚СЊ Р±СѓРґРёРЅРѕРє") },
+                    label = { Text("Будинок") },
+                    placeholder = { Text("Оберіть будинок") },
                     readOnly = true,
                     singleLine = true,
                     trailingIcon = {
@@ -653,13 +653,13 @@ private fun NewsScreen(
     ) {
         item {
             Text(
-                text = "РќРѕРІРёРЅРё РіСЂРѕРјР°РґРё",
+                text = "Новини громади",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (uiState.news.isEmpty()) {
             item {
-                EmptyCard("РџРѕРєРё С‰Рѕ РЅРѕРІРёРЅ РЅРµРјР°С” Р°Р±Рѕ РІРѕРЅРё С‰Рµ Р·Р°РІР°РЅС‚Р°Р¶СѓСЋС‚СЊСЃСЏ.")
+                EmptyCard("Поки що новин немає або вони ще завантажуються.")
             }
         } else {
             items(uiState.news) { news ->
@@ -736,7 +736,7 @@ private fun NewsDetailsDialog(
                             contentColor = Color.White,
                         ),
                     ) {
-                        Text("РќР°Р·Р°Рґ")
+                        Text("Назад")
                     }
                 }
             }
@@ -757,13 +757,13 @@ private fun LinksScreen(
     ) {
         item {
             Text(
-                text = "РљРѕСЂРёСЃРЅС– РїРѕСЃРёР»Р°РЅРЅСЏ",
+                text = "Корисні посилання",
                 style = MaterialTheme.typography.headlineSmall,
             )
         }
         if (uiState.links.isEmpty()) {
             item {
-                EmptyCard("РџРѕРєРё С‰Рѕ РЅРµРјР°С” РґРѕСЃС‚СѓРїРЅРёС… РїРѕСЃРёР»Р°РЅСЊ.")
+                EmptyCard("Поки що немає доступних посилань.")
             }
         } else {
             items(uiState.links) { link ->
@@ -787,11 +787,11 @@ private fun AlarmStatusCard(alarmActive: Boolean?) {
     }
 
     StatusCard(
-        title = "РўСЂРёРІРѕРіР°",
+        title = "Тривога",
         body = when (alarmActive) {
-            true -> "Р—Р°СЂР°Р· Р°РєС‚РёРІРЅР° РїРѕРІС–С‚СЂСЏРЅР° С‚СЂРёРІРѕРіР°. Р‘СѓРґСЊ Р»Р°СЃРєР°, РїРѕРґР±Р°Р№С‚Рµ РїСЂРѕ Р±РµР·РїРµРєСѓ."
-            false -> "РќР°СЂР°Р·С– Р°РєС‚РёРІРЅРѕС— РїРѕРІС–С‚СЂСЏРЅРѕС— С‚СЂРёРІРѕРіРё РЅРµРјР°С”."
-            null -> "РћРЅРѕРІР»СЋС”РјРѕ С–РЅС„РѕСЂРјР°С†С–СЋ РїСЂРѕ С‚СЂРёРІРѕРіСѓ."
+            true -> "Зараз активна повітряна тривога. Будь ласка, подбайте про безпеку."
+            false -> "Наразі активної повітряної тривоги немає."
+            null -> "Оновлюємо інформацію про тривогу."
         },
         containerColor = containerColor,
         contentColor = contentColor,
@@ -860,7 +860,7 @@ private fun MessageCard(message: NotificationMessage) {
         ) {
             Text(message.content)
             Text(
-                text = "РќР°РґС–СЃР»Р°РЅРѕ ${formatIsoDateTime(message.createdAt)}",
+                text = "Надіслано ${formatIsoDateTime(message.createdAt)}",
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -898,11 +898,11 @@ private fun OutagePeriodCard(period: OutagePeriod) {
                 text = periodStatus.title,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text("Р§Р°СЃ: ${period.formatTimeRange()}")
+            Text("Час: ${period.formatTimeRange()}")
             period.duration
                 ?.takeIf { it.isNotBlank() && it.uppercase() !in OUTAGE_STATUS_VALUES }
                 ?.let { duration ->
-                    Text("РўСЂРёРІР°Р»С–СЃС‚СЊ РІС–РґРєР»СЋС‡РµРЅРЅСЏ: $duration")
+                    Text("Тривалість відключення: $duration")
                 }
         }
     }
@@ -969,7 +969,7 @@ private fun TownTab.symbol(): String = when (this) {
 
 private fun formatIsoDateTime(value: String?): String {
     if (value.isNullOrBlank()) {
-        return "РЅРµРІС–РґРѕРјРѕ"
+        return "невідомо"
     }
     val normalizedValue = value.trim()
     runCatching { LocalTime.parse(normalizedValue) }
@@ -986,7 +986,7 @@ private fun formatIsoDateTime(value: String?): String {
             }
             .getOrThrow()
         DATE_TIME_FORMATTER.format(instant.atZone(ZoneId.systemDefault()))
-    }.getOrDefault("РґР°С‚Сѓ РЅРµ РІРєР°Р·Р°РЅРѕ")
+    }.getOrDefault("дату не вказано")
 }
 
 private fun OutagePeriod.status(): OutagePeriodStatus {
@@ -1002,11 +1002,11 @@ private fun OutagePeriod.formatTimeRange(): String {
     val fromTime = from.formatOutageTime()
     val toTime = to.formatOutageTime()
     return when {
-        fromTime == "00:00" && toTime == "24:00" -> "СѓРІРµСЃСЊ РґРµРЅСЊ"
-        fromTime != null && toTime != null -> "Р· $fromTime РґРѕ $toTime"
-        fromTime != null -> "Р· $fromTime"
-        toTime != null -> "РґРѕ $toTime"
-        else -> "РЅРµРІС–РґРѕРјРѕ"
+        fromTime == "00:00" && toTime == "24:00" -> "увесь день"
+        fromTime != null && toTime != null -> "з $fromTime до $toTime"
+        fromTime != null -> "з $fromTime"
+        toTime != null -> "до $toTime"
+        else -> "невідомо"
     }
 }
 
@@ -1030,16 +1030,16 @@ private val TIME_FORMATTER: DateTimeFormatter =
     DateTimeFormatter.ofPattern("HH:mm")
 
 private fun AppTheme.title(): String = when (this) {
-    AppTheme.System -> "РЇРє Сѓ С‚РµР»РµС„РѕРЅС–"
-    AppTheme.Light -> "РЎРІС–С‚Р»Р°"
-    AppTheme.Dark -> "РўРµРјРЅР°"
+    AppTheme.System -> "Як у телефоні"
+    AppTheme.Light -> "Світла"
+    AppTheme.Dark -> "Темна"
 }
 
 private enum class OutagePeriodStatus(val title: String) {
-    PowerOn("РЎРІС–С‚Р»Рѕ С”"),
-    PowerOff("РЎРІС–С‚Р»Р° РЅРµРјР°С”"),
-    ScheduledOutage("Р’С–РґРєР»СЋС‡РµРЅРЅСЏ"),
-    Unknown("РЎС‚Р°С‚СѓСЃ РіСЂР°С„С–РєР°"),
+    PowerOn("Світло є"),
+    PowerOff("Світла немає"),
+    ScheduledOutage("Відключення"),
+    Unknown("Статус графіка"),
 }
 
 private fun String.breakLongWords(maxChunkLength: Int = 16): String {
@@ -1055,7 +1055,7 @@ private fun String.breakLongWords(maxChunkLength: Int = 16): String {
 
 private fun String.formatQueueLabel(): String? {
     return trim()
-        .replace(Regex("^С‡РµСЂРіР°\\s*:?\\s*", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("^черга\\s*:?\\s*", RegexOption.IGNORE_CASE), "")
         .trim()
         .takeIf { it.isNotEmpty() }
 }

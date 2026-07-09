@@ -20,7 +20,7 @@ class FirebaseTokenProvider(
         if (!isFirebaseConfigured()) {
             return Result.failure(
                 IllegalStateException(
-                    "Firebase С‰Рµ РЅРµ РїС–РґРєР»СЋС‡РµРЅРёР№. Р”РѕРґР°Р№ google-services.json Сѓ app/ С– СЃРёРЅС…СЂРѕРЅС–Р·СѓР№ РїСЂРѕРµРєС‚.",
+                    "Firebase ще не підключений. Додай google-services.json у app/ і синхронізуй проект.",
                 ),
             )
         }

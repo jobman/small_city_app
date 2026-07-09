@@ -88,7 +88,7 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
             getString(R.string.app_name),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "РњС–СЃСЊРєС– СЃРїРѕРІС–С‰РµРЅРЅСЏ С‚Р° РІР°Р¶Р»РёРІС– РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ"
+            description = "Міські сповіщення та важливі повідомлення"
         }
         manager.createNotificationChannel(channel)
     }
