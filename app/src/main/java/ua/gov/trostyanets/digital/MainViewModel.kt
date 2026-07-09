@@ -1,4 +1,4 @@
-package com.example.smallcityapp
+package ua.gov.trostyanets.digital
 
 import android.app.Application
 import android.content.Context
@@ -7,15 +7,15 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.smallcityapp.data.DigitalTownRepository
-import com.example.smallcityapp.data.ExternalLinkItem
-import com.example.smallcityapp.data.LocalPushMessage
-import com.example.smallcityapp.data.NewsItem
-import com.example.smallcityapp.data.NotificationMessage
-import com.example.smallcityapp.data.OutageLookupRequest
-import com.example.smallcityapp.data.OutageResponse
-import com.example.smallcityapp.notifications.FirebaseTokenProvider
-import com.example.smallcityapp.notifications.LocalPushStore
+import ua.gov.trostyanets.digital.data.DigitalTownRepository
+import ua.gov.trostyanets.digital.data.ExternalLinkItem
+import ua.gov.trostyanets.digital.data.LocalPushMessage
+import ua.gov.trostyanets.digital.data.NewsItem
+import ua.gov.trostyanets.digital.data.NotificationMessage
+import ua.gov.trostyanets.digital.data.OutageLookupRequest
+import ua.gov.trostyanets.digital.data.OutageResponse
+import ua.gov.trostyanets.digital.notifications.FirebaseTokenProvider
+import ua.gov.trostyanets.digital.notifications.LocalPushStore
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,11 +29,11 @@ import java.time.OffsetDateTime
 import java.time.ZoneId
 
 enum class TownTab(val title: String) {
-    Notifications("Сповіщ."),
-    Outages("Графік"),
-    News("Новини"),
-    Links("Ще"),
-    Profile("Профіль"),
+    Notifications("РЎРїРѕРІС–С‰."),
+    Outages("Р“СЂР°С„С–Рє"),
+    News("РќРѕРІРёРЅРё"),
+    Links("Р©Рµ"),
+    Profile("РџСЂРѕС„С–Р»СЊ"),
 }
 
 enum class AppTheme {
@@ -397,7 +397,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 it.copy(
                     historyLoading = false,
                     historyError = tokenResult.exceptionOrNull()?.toUserMessage(appContext)
-                        ?: "Не вдалося отримати Firebase token",
+                        ?: "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё Firebase token",
                 )
             }
             return
@@ -479,12 +479,12 @@ private fun Throwable.toUserMessage(context: Context): String {
     val isNetworkError = generateSequence(this) { it.cause }.any { it is IOException }
     return if (isNetworkError) {
         if (context.hasValidatedInternetConnection()) {
-            "Немає зв'язку з сервером. Спробуйте ще раз трохи пізніше."
+            "РќРµРјР°С” Р·РІ'СЏР·РєСѓ Р· СЃРµСЂРІРµСЂРѕРј. РЎРїСЂРѕР±СѓР№С‚Рµ С‰Рµ СЂР°Р· С‚СЂРѕС…Рё РїС–Р·РЅС–С€Рµ."
         } else {
-            "Немає з'єднання з інтернетом. Перевірте мережу та спробуйте ще раз."
+            "РќРµРјР°С” Р·'С”РґРЅР°РЅРЅСЏ Р· С–РЅС‚РµСЂРЅРµС‚РѕРј. РџРµСЂРµРІС–СЂС‚Рµ РјРµСЂРµР¶Сѓ С‚Р° СЃРїСЂРѕР±СѓР№С‚Рµ С‰Рµ СЂР°Р·."
         }
     } else {
-        "Не вдалося оновити дані. Спробуйте ще раз трохи пізніше."
+        "РќРµ РІРґР°Р»РѕСЃСЏ РѕРЅРѕРІРёС‚Рё РґР°РЅС–. РЎРїСЂРѕР±СѓР№С‚Рµ С‰Рµ СЂР°Р· С‚СЂРѕС…Рё РїС–Р·РЅС–С€Рµ."
     }
 }
 
@@ -603,5 +603,5 @@ private fun String?.visibleTitleOrNull(): String? {
 }
 
 private val INVISIBLE_TITLE_CHARACTERS = Regex("[\\u200B\\u200C\\u200D\\uFEFF]")
-private const val OUTAGE_SCHEDULE_UNAVAILABLE_MESSAGE = "Для обраної адреси відсутній графік відключень"
+private const val OUTAGE_SCHEDULE_UNAVAILABLE_MESSAGE = "Р”Р»СЏ РѕР±СЂР°РЅРѕС— Р°РґСЂРµСЃРё РІС–РґСЃСѓС‚РЅС–Р№ РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ"
 private const val NEW_MESSAGE_TTL_MS = 12 * 60 * 60 * 1_000L

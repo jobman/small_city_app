@@ -1,4 +1,4 @@
-package com.example.smallcityapp.data
+package ua.gov.trostyanets.digital.data
 
 import com.google.gson.annotations.SerializedName
 

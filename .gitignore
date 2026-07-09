@@ -17,3 +17,5 @@
 local.properties
 digital_town/
 app/google-services.json
+keystore.properties
+app/upload-keystore.jks

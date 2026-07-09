@@ -1,4 +1,4 @@
-package com.example.smallcityapp.data
+package ua.gov.trostyanets.digital.data
 
 import retrofit2.Response
 import retrofit2.http.Body

@@ -1,9 +1,9 @@
-package com.example.smallcityapp.notifications
+package ua.gov.trostyanets.digital.notifications
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.example.smallcityapp.R
-import com.example.smallcityapp.data.LocalPushMessage
+import ua.gov.trostyanets.digital.R
+import ua.gov.trostyanets.digital.data.LocalPushMessage
 import org.json.JSONArray
 import org.json.JSONObject
 

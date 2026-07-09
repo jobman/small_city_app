@@ -1,6 +1,6 @@
-package com.example.smallcityapp.data
+package ua.gov.trostyanets.digital.data
 
-import com.example.smallcityapp.config.ServerConfig
+import ua.gov.trostyanets.digital.config.ServerConfig
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONArray
@@ -38,7 +38,7 @@ class DigitalTownRepository(
             val state = lookupOutageState(request).getOrThrow()
             state.response ?: throw IllegalStateException(
                 buildString {
-                    append(state.message?.toFriendlyOutageMessage() ?: "Не вдалося отримати графік відключень")
+                    append(state.message?.toFriendlyOutageMessage() ?: "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ")
                     val options = buildList {
                         addAll(state.availableCities)
                         addAll(state.availableStreets)
@@ -66,7 +66,7 @@ class DigitalTownRepository(
                 OutageLookupState(
                     response = response.body()
                         ?.withFallbackAddress(request)
-                        ?: error("Порожня відповідь сервера"),
+                        ?: error("РџРѕСЂРѕР¶РЅСЏ РІС–РґРїРѕРІС–РґСЊ СЃРµСЂРІРµСЂР°"),
                 )
             } else {
                 val payload = parseOutageError(response.errorBody()?.string())
@@ -82,13 +82,13 @@ class DigitalTownRepository(
 
     private fun parseOutageError(rawBody: String?): OutageErrorPayload {
         if (rawBody.isNullOrBlank()) {
-            return OutageErrorPayload(message = "Не вдалося отримати графік відключень")
+            return OutageErrorPayload(message = "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ")
         }
 
         return runCatching {
             val json = JSONObject(rawBody)
             OutageErrorPayload(
-                message = json.optString("error", "Не вдалося отримати графік відключень"),
+                message = json.optString("error", "РќРµ РІРґР°Р»РѕСЃСЏ РѕС‚СЂРёРјР°С‚Рё РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ"),
                 availableCities = json.optJSONArrayStrings("available_cities"),
                 availableStreets = json.optJSONArrayStrings("available_streets"),
                 availableBuildings = json.optJSONArrayStrings("available_buildings"),
@@ -136,9 +136,9 @@ class DigitalTownRepository(
             val normalized = trim().lowercase()
             return if (
                 normalized == "schedule not found for the selected address" ||
-                normalized.contains("не підтримує графіка відключень")
+                normalized.contains("РЅРµ РїС–РґС‚СЂРёРјСѓС” РіСЂР°С„С–РєР° РІС–РґРєР»СЋС‡РµРЅСЊ")
             ) {
-                "Для обраної адреси відсутній графік відключень"
+                "Р”Р»СЏ РѕР±СЂР°РЅРѕС— Р°РґСЂРµСЃРё РІС–РґСЃСѓС‚РЅС–Р№ РіСЂР°С„С–Рє РІС–РґРєР»СЋС‡РµРЅСЊ"
             } else {
                 this
             }

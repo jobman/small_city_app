@@ -1,13 +1,13 @@
-package com.example.smallcityapp.notifications
+package ua.gov.trostyanets.digital.notifications
 
 import android.content.Intent
 import android.os.Bundle
 
 object PushMessagePayload {
-    const val EXTRA_TITLE = "com.example.smallcityapp.PUSH_TITLE"
-    const val EXTRA_BODY = "com.example.smallcityapp.PUSH_BODY"
-    const val EXTRA_RECEIVED_AT = "com.example.smallcityapp.PUSH_RECEIVED_AT"
-    const val EXTRA_HANDLED = "com.example.smallcityapp.PUSH_HANDLED"
+    const val EXTRA_TITLE = "ua.gov.trostyanets.digital.PUSH_TITLE"
+    const val EXTRA_BODY = "ua.gov.trostyanets.digital.PUSH_BODY"
+    const val EXTRA_RECEIVED_AT = "ua.gov.trostyanets.digital.PUSH_RECEIVED_AT"
+    const val EXTRA_HANDLED = "ua.gov.trostyanets.digital.PUSH_HANDLED"
 
     private val TITLE_KEYS = listOf(
         "title",

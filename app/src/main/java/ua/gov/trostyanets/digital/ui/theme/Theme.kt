@@ -1,4 +1,4 @@
-package com.example.smallcityapp.ui.theme
+package ua.gov.trostyanets.digital.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme

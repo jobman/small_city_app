@@ -1,4 +1,4 @@
-package com.example.smallcityapp.notifications
+package ua.gov.trostyanets.digital.notifications
 
 import android.Manifest
 import android.app.NotificationChannel
@@ -11,9 +11,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.example.smallcityapp.MainActivity
-import com.example.smallcityapp.R
-import com.example.smallcityapp.data.LocalPushMessage
+import ua.gov.trostyanets.digital.MainActivity
+import ua.gov.trostyanets.digital.R
+import ua.gov.trostyanets.digital.data.LocalPushMessage
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -88,7 +88,7 @@ class DigitalTownFirebaseMessagingService : FirebaseMessagingService() {
             getString(R.string.app_name),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Міські сповіщення та важливі повідомлення"
+            description = "РњС–СЃСЊРєС– СЃРїРѕРІС–С‰РµРЅРЅСЏ С‚Р° РІР°Р¶Р»РёРІС– РїРѕРІС–РґРѕРјР»РµРЅРЅСЏ"
         }
         manager.createNotificationChannel(channel)
     }

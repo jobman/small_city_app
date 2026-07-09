@@ -1,4 +1,4 @@
-package com.example.smallcityapp
+package ua.gov.trostyanets.digital
 
 import org.junit.Test
 
