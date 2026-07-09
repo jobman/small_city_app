@@ -1,7 +1,7 @@
 Digital Town Backend Endpoints
 
 Base URL
-- Production example: http://16.16.144.225
+- Production example: https://digital.trostyanets-miskrada.gov.ua/
 - All paths below are relative to the project root.
 
 General Notes
@@ -479,4 +479,3 @@ Main frontend integration points
   - simple polling endpoint returning `{ "alert": true/false }`
 - Notifications history:
   - mobile/client endpoint per selected address + firebase token
-
